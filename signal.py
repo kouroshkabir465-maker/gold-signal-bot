@@ -353,5 +353,9 @@ def weekly():
 if __name__ == "__main__":
     if "--watch" in sys.argv: watch()
     elif "--weekly" in sys.argv: weekly()
+    elif "--status" in sys.argv:   # 4H status post; skip when market closed / data stale
+        a = analyze()
+        if a["age"] > 3600: print(f"data stale ({a['age']:.0f}s), skip")
+        else: send_analysis(a); print("SENT OK")
     else:
         a = analyze(); print(a["msg"]); send_analysis(a)

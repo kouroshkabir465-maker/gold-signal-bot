@@ -14,7 +14,7 @@ jobs:
       - name: Re-enable workflows
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
-          for w in watcher.yml news.yml weekly.yml reply.yml keepalive.yml; do
+          for w in watcher.yml news.yml weekly.yml reply.yml status.yml keepalive.yml; do
             gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$w/enable" && echo "enabled $w"
           done
       - name: Commit to main if last commit is older than 30 days
