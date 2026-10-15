@@ -64,4 +64,8 @@ def main():
             time.sleep(10)
         if once: return
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    if "--reply" in sys.argv:   # GitHub Actions reply.yml: message text comes from the dispatch payload (env TG_TEXT)
+        reply(OWNER, (os.environ.get("TG_TEXT") or "").strip())
+    else:
+        main()

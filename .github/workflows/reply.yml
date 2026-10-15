@@ -1,0 +1,26 @@
+name: Reply to Telegram message
+on:
+  repository_dispatch:
+    types: [tg_message]
+  workflow_dispatch:
+    inputs:
+      text: { description: "message text", default: "/check" }
+permissions:
+  contents: read
+jobs:
+  reply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: Europe/Istanbul
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+      MPLCONFIGDIR: /tmp/mpl
+      TG_TEXT: ${{ github.event.client_payload.text || inputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - run: pip install -q -r requirements.txt
+      - run: python listener.py --reply
