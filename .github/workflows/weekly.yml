@@ -1,0 +1,30 @@
+name: Weekly summary Fri 23:20 Istanbul
+on:
+  schedule:
+    - cron: '20 20 * * 5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: gold-bot-state
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Europe/Istanbul
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+      MPLCONFIGDIR: /tmp/mpl
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - run: pip install -q -r requirements.txt
+      - run: ci/state.sh pull
+      - run: python signal.py --weekly
+      - if: always()
+        run: ci/state.sh push

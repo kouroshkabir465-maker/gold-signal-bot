@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+cache/
+logs/
+*.png
+state.json
+trades.json
+listener_offset.json
+*.env
