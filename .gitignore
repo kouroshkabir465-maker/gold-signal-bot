@@ -7,3 +7,4 @@ state.json
 trades.json
 listener_offset.json
 *.env
+heartbeat.txt
