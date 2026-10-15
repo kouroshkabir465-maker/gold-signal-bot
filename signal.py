@@ -350,12 +350,66 @@ def weekly():
     if not ts: msg += "\n\nاین هفته سیگنالی با همهٔ فیلترها پیدا نشد."
     say(msg)
 
+# ---------------- 4H market structure (report only; NOT used by signals) ----------------
+import html as _html
+def structure(d4, k=3):
+    """Swing-pivot structure on 4H. Returns Farsi HTML section; informational only."""
+    d = d4.iloc[:-1] if len(d4) > 2 * k + 5 else d4   # drop forming bar
+    H, L, C, n = d.High.values, d.Low.values, d.Close.values, len(d)
+    piv = []  # (confirm_idx, idx, kind, price)
+    for i in range(k, n - k):
+        if H[i] == H[i-k:i+k+1].max(): piv.append((i + k, i, "H", float(H[i])))
+        if L[i] == L[i-k:i+k+1].min(): piv.append((i + k, i, "L", float(L[i])))
+    hs = [p for p in piv if p[2] == "H"]; ls = [p for p in piv if p[2] == "L"]
+    if len(hs) < 2 or len(ls) < 2: return ""
+    # BOS / CHoCH by close beyond last confirmed pivot
+    trend, ev, lastH, lastL, used = 0, None, None, None, set()
+    pv = sorted(piv); j = 0
+    for t in range(n):
+        while j < len(pv) and pv[j][0] <= t:
+            if pv[j][2] == "H": lastH = pv[j]
+            else: lastL = pv[j]
+            j += 1
+        if lastH and lastH[1] not in used and C[t] > lastH[3]:
+            ev = ("CHoCH" if trend < 0 else "BOS", 1, lastH[3], t); trend = 1; used.add(lastH[1])
+        elif lastL and lastL[1] not in used and C[t] < lastL[3]:
+            ev = ("CHoCH" if trend > 0 else "BOS", -1, lastL[3], t); trend = -1; used.add(lastL[1])
+    h1, h2, l1, l2 = hs[-2][3], hs[-1][3], ls[-2][3], ls[-1][3]
+    if h2 > h1 and l2 > l1: st, sd = "🟢 صعودی (HH/HL)", 1
+    elif h2 < h1 and l2 < l1: st, sd = "🔴 نزولی (LH/LL)", -1
+    else: st, sd = "⚪️ رنج", 0
+    out = [f"🏗 <b>ساختار بازار ۴ ساعته</b>", f"• نوع ساختار: {st}"]
+    if ev:
+        nm = "تغییر روند (CHoCH)" if ev[0] == "CHoCH" else "شکست ساختار (BOS)"
+        when = d.index[ev[3]].tz_convert(TZ).strftime("%m-%d %H:%M")
+        out.append(f"• آخرین {nm}: {'⬆️ صعودی' if ev[1] > 0 else '⬇️ نزولی'} در {ev[2]:.2f} ({when})")
+    else: out.append("• شکست ساختار: ندارد")
+    out.append(f"• سقف کلیدی: {h2:.2f} | کف کلیدی: {l2:.2f}")
+    if sd >= 0 and (sd > 0 or (ev and ev[1] > 0)):
+        sc = f"تا بالای {l2:.2f} سناریوی صعودی معتبره؛ شکست {h2:.2f} → هدف بعدی {h2 + (h2 - l2):.2f}. بسته شدن زیر {l2:.2f} → هدف {min(l1, l2) if l1 < l2 else l2 - (h2 - l2):.2f}"
+    elif sd <= 0 and (sd < 0 or (ev and ev[1] < 0)):
+        sc = f"تا زیر {h2:.2f} سناریوی نزولی معتبره؛ شکست {l2:.2f} → هدف بعدی {l2 - (h2 - l2):.2f}. بسته شدن بالای {h2:.2f} → هدف {max(h1, h2) if h1 > h2 else h2 + (h2 - l2):.2f}"
+    else:
+        sc = f"رنج بین {l2:.2f} و {h2:.2f}؛ بسته شدن بالای {h2:.2f} → صعودی، زیر {l2:.2f} → نزولی"
+    out.append("• سناریوی محتمل: " + _html.escape(sc, quote=False))
+    return "\n".join(out)
+
+def with_structure(a):
+    """Insert structure section before disclaimer; on any error return msg unchanged."""
+    try:
+        sec = structure(a["d4"])
+        if not sec: return a["msg"]
+        m = a["msg"]; cut = m.rfind("\n\n⚠️")
+        return (m[:cut] + "\n\n" + sec + m[cut:]) if cut > 0 else m + "\n\n" + sec
+    except Exception as e:
+        print("structure failed:", e); return a["msg"]
+
 if __name__ == "__main__":
     if "--watch" in sys.argv: watch()
     elif "--weekly" in sys.argv: weekly()
     elif "--status" in sys.argv:   # 4H status post; skip when market closed / data stale
         a = analyze()
         if a["age"] > 3600: print(f"data stale ({a['age']:.0f}s), skip")
-        else: send_analysis(a); print("SENT OK")
+        else: a["msg"] = with_structure(a); send_analysis(a); print("SENT OK")
     else:
-        a = analyze(); print(a["msg"]); send_analysis(a)
+        a = analyze(); a["msg"] = with_structure(a); print(a["msg"]); send_analysis(a)

@@ -26,7 +26,7 @@ def reply(chat, text):
         send("sendMessage", data={"chat_id": chat, "text": news.build(), "parse_mode": "HTML"}); return
     send("sendChatAction", data={"chat_id": chat, "action": "typing"})
     a = gs.analyze()
-    msg = a["msg"]
+    msg = gs.with_structure(a)
     if a["age"] > 3600:
         msg = "🌙 <b>الان بازار طلا بسته‌ست</b> (یا داده تازه نیست)؛ این تحلیل مربوط به آخرین قیمت قبل از تعطیلیه.\n\n" + msg
     if a["age"] <= 3600 and not a.get("session", True):
