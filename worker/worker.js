@@ -13,7 +13,7 @@ export default {
     const text = (m.text || "").slice(0, 500);
     const tg = (method, body) => fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`,
       { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const ack = tg("sendMessage", { chat_id: OWNER, text: "در حال بررسی... ⏳", reply_to_message_id: m.message_id });
+    const ack = tg("sendMessage", { chat_id: OWNER, text: "در حال بررسی... ⏳", reply_parameters: { message_id: m.message_id, allow_sending_without_reply: true } });
     const gh = fetch(`https://api.github.com/repos/${REPO}/dispatches`, {
       method: "POST",
       headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: "application/vnd.github+json",
