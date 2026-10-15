@@ -1,0 +1,28 @@
+name: Keepalive (prevent 60-day schedule disable)
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 09:00 Istanbul
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: write
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-enable workflows
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          for w in watcher.yml news.yml weekly.yml reply.yml keepalive.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$w/enable" && echo "enabled $w"
+          done
+      - name: Commit to main if last commit is older than 30 days
+        run: |
+          age=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "last commit on main: $age days ago"
+          if [ "$age" -ge 30 ]; then
+            date -u +%FT%TZ > .github/keepalive.txt
+            git config user.name gold-bot; git config user.email gold-bot@users.noreply.github.com
+            git add .github/keepalive.txt; git commit -m "keepalive $(date -u +%F)"; git push
+          fi
