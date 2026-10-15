@@ -113,7 +113,7 @@ def checks(r, tf, side, strict=STRICT):
               ("chikou", ("چیکو (خط تأخیری) تأیید می‌کنه", r.chikou == side)),
               ("fut", ("ابر آینده هم‌جهت", r.fut == side))] if f in FILTERS]
     if strict and tf == "15m":
-        c += [x for f, x in [("rsi_ext", ("RSI اشباع نیست" + (" (<۷۵)" if b else " (>۲۵)"), r.rsi < RSI_MAX_BUY if b else r.rsi > RSI_MIN_SELL)),
+        c += [x for f, x in [("rsi_ext", ("RSI اشباع نیست" + (" (&lt;۷۵)" if b else " (&gt;۲۵)"), r.rsi < RSI_MAX_BUY if b else r.rsi > RSI_MIN_SELL)),
               ("atr", ("بازار نوسان کافی داره (ATR)", r.atr_ratio >= MIN_ATR_RATIO))] if f in FILTERS]
     return c
 
