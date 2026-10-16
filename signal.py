@@ -332,6 +332,12 @@ def headsup(st, a):
     msg = (f"⚡️ <b>آماده‌باش {'خرید' if dir4 > 0 else 'فروش'}</b> — روند ۴ ساعته {'صعودی' if dir4 > 0 else 'نزولی'}ه و ۱۵ دقیقه نزدیک ورود.\n"
            f"مونده: {'، '.join(c[i][0] for i in bad)}\nقیمت: <b>{price:.2f}</b>\n"
            "احتمالاً تو ۱۵ تا ۳۰ دقیقه آینده سیگنال میاد؛ آماده باش.")
+    try:
+        lv = levels(d15, dir4)
+        msg += (f"\n\n🎯 <b>ورود احتمالی:</b> {lv['entry']:.2f}\n🛑 <b>حد ضرر:</b> {lv['sl']:.2f}\n"
+                f"✅ <b>تارگت ۱:</b> {lv['tp1']:.2f}\n✅ <b>تارگت ۲:</b> {lv['tp2']:.2f}\n"
+                "این عددها تقریبیه؛ عدد دقیق با سیگنال اصلی میاد. سفارشت رو آماده کن ولی تا سیگنال نیومده وارد نشو.")
+    except Exception as e: print(f"headsup levels failed: {e}")
     st.setdefault("headsup", {})[k] = c4; save(STATE, st)
     try:
         p = os.path.join(HERE, "headsup.png"); plot(d4, d15, None, p)
