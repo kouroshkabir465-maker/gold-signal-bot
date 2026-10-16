@@ -103,9 +103,11 @@ def indicators(d):
 def checks(r, tf, side, strict=STRICT):
     """Ordered list of (Farsi label, passed) for a timeframe ('4h'/'15m') and side (+1/-1)."""
     b = side > 0
-    c = [("تنکن " + ("بالای" if b else "زیر") + " کیجون", r.tk == side),
-         ("قیمت " + ("بالای" if b else "زیر") + " ابر", r.cloud == side),
-         (f"RSI {'بالای ۵۵' if b else 'زیر ۴۵'}", r.rsi > 55 if b else r.rsi < 45)]
+    cl = {1: "بالای ابر", -1: "زیر ابر"}.get(int(r.cloud), "داخل ابر")
+    tkl = "تنکن بالای کیجون" if r.tk > 0 else ("تنکن زیر کیجون" if r.tk < 0 else "تنکن روی کیجون")
+    c = [(tkl + (" (لازم: " + ("بالای" if b else "زیر") + ")" if r.tk != side else ""), r.tk == side),
+         ("قیمت " + cl + (" (لازم: " + ("بالای" if b else "زیر") + " ابر)" if r.cloud != side else ""), r.cloud == side),
+         (f"RSI {r.rsi:.1f}" + (f" (لازم: {'بالای ۵۵' if b else 'زیر ۴۵'})" if not (r.rsi > 55 if b else r.rsi < 45) else f" {'بالای ۵۵' if b else 'زیر ۴۵'}"), r.rsi > 55 if b else r.rsi < 45)]
     if tf == "15m":
         c.append((f"RSI {'بالای' if b else 'زیر'} مووینگ ۹", r.mapos == side))
     if strict and tf == "4h":
@@ -378,6 +380,9 @@ def structure(d4, k=3):
     if h2 > h1 and l2 > l1: st, sd = "🟢 صعودی (HH/HL)", 1
     elif h2 < h1 and l2 < l1: st, sd = "🔴 نزولی (LH/LL)", -1
     else: st, sd = "⚪️ رنج", 0
+    chg = bool(ev and ev[0] == "CHoCH" and ev[1] != sd)
+    if chg:
+        sd = ev[1]; st = "🟢 تغییر به صعودی (CHoCH)" if sd > 0 else "🔴 تغییر به نزولی (CHoCH)"
     out = [f"🏗 <b>ساختار بازار ۴ ساعته</b>", f"• نوع ساختار: {st}"]
     if ev:
         nm = "تغییر روند (CHoCH)" if ev[0] == "CHoCH" else "شکست ساختار (BOS)"
@@ -385,7 +390,13 @@ def structure(d4, k=3):
         out.append(f"• آخرین {nm}: {'⬆️ صعودی' if ev[1] > 0 else '⬇️ نزولی'} در {ev[2]:.2f} ({when})")
     else: out.append("• شکست ساختار: ندارد")
     out.append(f"• سقف کلیدی: {h2:.2f} | کف کلیدی: {l2:.2f}")
-    if sd >= 0 and (sd > 0 or (ev and ev[1] > 0)):
+    if chg and sd > 0:
+        tg = h1 if h1 > ev[2] else ev[2] + (ev[2] - l2)
+        sc = f"سقف {ev[2]:.2f} شکسته شد و سناریوی صعودی فعاله تا وقتی بالای {l2:.2f} بمونه؛ هدف بعدی {tg:.2f}. برگشت و بسته شدن زیر {ev[2]:.2f} یعنی شکست ضعیف بوده"
+    elif chg and sd < 0:
+        tg = l1 if l1 < ev[2] else ev[2] - (h2 - ev[2])
+        sc = f"کف {ev[2]:.2f} شکسته شد و سناریوی نزولی فعاله تا وقتی زیر {h2:.2f} بمونه؛ هدف بعدی {tg:.2f}. برگشت و بسته شدن بالای {ev[2]:.2f} یعنی شکست ضعیف بوده"
+    elif sd >= 0 and (sd > 0 or (ev and ev[1] > 0)):
         sc = f"تا بالای {l2:.2f} سناریوی صعودی معتبره؛ شکست {h2:.2f} → هدف بعدی {h2 + (h2 - l2):.2f}. بسته شدن زیر {l2:.2f} → هدف {min(l1, l2) if l1 < l2 else l2 - (h2 - l2):.2f}"
     elif sd <= 0 and (sd < 0 or (ev and ev[1] < 0)):
         sc = f"تا زیر {h2:.2f} سناریوی نزولی معتبره؛ شکست {l2:.2f} → هدف بعدی {l2 - (h2 - l2):.2f}. بسته شدن بالای {h2:.2f} → هدف {max(h1, h2) if h1 > h2 else h2 + (h2 - l2):.2f}"
