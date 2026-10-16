@@ -31,6 +31,7 @@ RSI_MAX_BUY, RSI_MIN_SELL = 75, 25
 MIN_ATR_RATIO = 0.7        # 15m ATR vs its 200-bar median
 SESSION = (0, 24)         # Istanbul hours for watcher signals
 STRICT = True
+HEADSUP = True  # pre-signal "آماده‌باش" alert in watcher (independent of FILTERS)
 FILTERS = {"chikou", "rsi_ext", "atr"}  # dist & fut disabled: hurt in backtest # active strict filters
 
 # ---------------- data ----------------
@@ -317,6 +318,29 @@ def track(d15):
             t["last_checked"] = str(ts)
     save(TRADES, trades)
 
+def headsup(st, a):
+    """Pre-signal alert: 4H confirmed, 15m misses only one check (or only the two RSI checks)."""
+    if not HEADSUP or a["side"] or a["blackout"] or not a["session"]: return
+    d4, d15 = a["d4"], a["d15"]; dir4 = direction(d4.iloc[-1], "4h")
+    if not dir4: return
+    c = checks(d15.iloc[-1], "15m", dir4)
+    bad = [i for i, (_, ok) in enumerate(c) if not ok]
+    if not (len(bad) == 1 or set(bad) == {2, 3}): return
+    c4 = str(d4.index[-1]); k = str(dir4)
+    if st.get("headsup", {}).get(k) == c4 or st.get("sig4", {}).get(k) == c4: return
+    price = d15.Close.iloc[-1]
+    msg = (f"⚡️ <b>آماده‌باش {'خرید' if dir4 > 0 else 'فروش'}</b> — روند ۴ ساعته {'صعودی' if dir4 > 0 else 'نزولی'}ه و ۱۵ دقیقه نزدیک ورود.\n"
+           f"مونده: {'، '.join(c[i][0] for i in bad)}\nقیمت: <b>{price:.2f}</b>\n"
+           "احتمالاً تو ۱۵ تا ۳۰ دقیقه آینده سیگنال میاد؛ آماده باش.")
+    st.setdefault("headsup", {})[k] = c4; save(STATE, st)
+    try:
+        p = os.path.join(HERE, "headsup.png"); plot(d4, d15, None, p)
+        if not DRY:
+            with open(p, "rb") as f:
+                tg("sendPhoto", data={"chat_id": CHAT_ID, "caption": "چارت آماده‌باش: ۴ ساعته و ۱۵ دقیقه"}, files={"photo": f})
+    except Exception as e: print(f"headsup chart failed: {e}")
+    say(msg); print("HEADSUP SENT")
+
 def watch():
     st = load(STATE, {})
     news_alerts(st); save(STATE, st)
@@ -326,6 +350,8 @@ def watch():
     print(f"[{dt.datetime.now(TZ):%F %H:%M}] side={a['side']} key={a['key']} prev={st.get('key')} "
           f"session={a['session']} blackout={bool(a['blackout'])} age={a['age']:.0f}s src={a['src']}")
     if a["age"] > 3600: print("data stale / market closed"); return
+    try: headsup(st, a)
+    except Exception as e: print(f"headsup failed: {e}")
     key = a["key"] if a["side"] else "none"
     if key == st.get("key"): return
     if a["side"] and not a["session"]: print("signal held: outside session"); return
@@ -333,6 +359,7 @@ def watch():
     st["key"] = key; save(STATE, st)
     if not a["side"]: return
     send_analysis(a)
+    st.setdefault("sig4", {})[str(a["side"])] = str(a["d4"].index[-1]); save(STATE, st)
     lv = a["lv"]; trades = load(TRADES, [])
     trades.append(dict(id=len(trades) + 1, side=a["side"], time=str(dt.datetime.now(TZ)), bar=str(a["d15"].index[-1]),
                        entry=lv["entry"], sl=lv["sl"], tp1=lv["tp1"], tp2=lv["tp2"], src=a["src"],
