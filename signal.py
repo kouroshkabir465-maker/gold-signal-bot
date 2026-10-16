@@ -202,7 +202,7 @@ def analyze():
         v += f"\n\n📰⚠️ خبر مهم {e['title']} ساعت {t:%H:%M} — از ۳۰ دقیقه قبل تا ۱۵ دقیقه بعدش سیگنال جدید نمی‌دم."
     msg = (f"🪙 <b>تحلیل طلا</b> ({src})\n💰 قیمت: <b>{d15.Close.iloc[-1]:.2f}</b>\n\n"
            f"{block('📊 تایم ۴ ساعته (جهت)', d4, '4h', dir4)}\n\n{block('⏱ تایم ۱۵ دقیقه (ورود)', d15, '15m', dir15, dir4 or int(d4.iloc[-1].tk) or 1)}\n\n"
-           f"<b>نتیجه:</b> {v}\n\n⚠️ این پیام توصیه مالی نیست؛ فقط تحلیل خودکار اندیکاتورهاست.")
+           f"<b>نتیجه:</b> {v}")
     age = (pd.Timestamp.now(tz="UTC") - d15.index[-1].tz_convert("UTC")).total_seconds()
     return dict(msg=msg, side=side, lv=lv, d4=d4, d15=d15, age=age, src=src, blackout=bo,
                 session=in_session(now), key=f"{side}|{d15.cross_id.iloc[-1]}|{d15.index[d15.cross_id == d15.cross_id.iloc[-1]][0]}")
