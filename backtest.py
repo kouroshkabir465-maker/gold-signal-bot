@@ -8,7 +8,7 @@ sp = importlib.util.spec_from_file_location("gs", os.path.join(HERE, "signal.py"
 import pandas as pd, numpy as np
 
 h1 = gs._yf("1h", "730d")
-h4 = gs.indicators(h1.resample("4h", origin="epoch").agg({"Open":"first","High":"max","Low":"min","Close":"last","Volume":"sum"}).dropna())
+h4 = gs.indicators(gs.to_h4(h1))
 d15 = gs.indicators(gs._yf("15m", "60d"))
 
 for _d in (h4, d15): _d.index = _d.index.tz_convert("UTC").as_unit("ns")

@@ -1,14 +1,14 @@
 #!/bin/bash
 # Persist bot state files on a separate 'state' branch.  usage: ci/state.sh pull|push
 set -e
-FILES="state.json trades.json listener_offset.json heartbeat.txt"
+FILES="${STATE_FILES:-state.json trades.json listener_offset.json heartbeat.txt status.json}"
 if [ "$1" = pull ]; then
   if git fetch -q origin state 2>/dev/null; then
     for f in $FILES; do git show origin/state:$f > $f 2>/dev/null || rm -f $f; done
   fi
   exit 0
 fi
-date -u +%F > heartbeat.txt   # one commit/day max: proves push works, keeps repo active
+[ -z "$STATE_FILES" ] && date -u +%F > heartbeat.txt   # one commit/day max: proves push works, keeps repo active
 tmp=$(mktemp -d); for f in $FILES; do [ -f $f ] && cp $f $tmp/; done
 git config user.name "gold-bot"; git config user.email "gold-bot@users.noreply.github.com"
 git worktree add -q --detach $tmp/wt 2>/dev/null

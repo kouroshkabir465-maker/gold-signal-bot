@@ -68,13 +68,30 @@ def _yf(interval, period):
     if isinstance(d.columns, pd.MultiIndex): d.columns = d.columns.get_level_values(0)
     return d[["Open","High","Low","Close","Volume"]].dropna()
 
+MT_TZ = "Europe/Athens"   # MT5 broker server time (EET/EEST): 4H bars open 00/04/08/12/16/20 local
+
+def to_h4(h1):
+    """Resample 1h OHLC into MT5-aligned 4H bars (Athens-midnight anchored, DST-safe), UTC index."""
+    if h1 is None or not len(h1): return h1
+    x = h1.copy()
+    x.index = (x.index.tz_localize("UTC") if x.index.tz is None else x.index).tz_convert(MT_TZ)
+    key = x.index.map(lambda t: t.replace(hour=t.hour - t.hour % 4, minute=0, second=0, microsecond=0))
+    g = x.groupby(key).agg({"Open":"first","High":"max","Low":"min","Close":"last","Volume":"sum"}).dropna()
+    g.index = pd.DatetimeIndex(g.index).tz_convert("UTC"); g.index.name = None
+    return g.sort_index()
+
+def last_h4_boundary(now=None):
+    """Most recent MT 4H bar open (aware, Athens tz)."""
+    t = (now or dt.datetime.now(dt.timezone.utc)).astimezone(ZoneInfo(MT_TZ))
+    return t.replace(hour=t.hour - t.hour % 4, minute=0, second=0, microsecond=0)
+
 def get_data():
     """-> (d4 raw, d15 raw, source label)"""
-    h4, m15 = _td_get("4h", 600), _td_get("15min", 1500)
+    h1, m15 = _td_get("1h", 2000), _td_get("15min", 1500)
+    h4 = to_h4(h1)
     if h4 is not None and m15 is not None and len(h4) > 120 and len(m15) > 300:
         return h4, m15, "XAU/USD · Twelve Data"
-    h1 = _yf("1h", "730d")
-    h4 = h1.resample("4h", origin="epoch").agg({"Open":"first","High":"max","Low":"min","Close":"last","Volume":"sum"}).dropna()
+    h4 = to_h4(_yf("1h", "730d"))
     return h4, _yf("15m", "60d"), "GC=F · Yahoo (تأخیر ~۱۵ دقیقه)"
 
 # ---------------- indicators / rules ----------------
@@ -452,8 +469,16 @@ if __name__ == "__main__":
     if "--watch" in sys.argv: watch()
     elif "--weekly" in sys.argv: weekly()
     elif "--status" in sys.argv:   # 4H status post; skip when market closed / data stale
+        manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch" or "--force" in sys.argv
+        now = dt.datetime.now(dt.timezone.utc); b = last_h4_boundary(now)
+        SP = os.path.join(HERE, "status.json"); st = load(SP, {})
+        if not manual and (now - b).total_seconds() > 3600: print(f"no 4H close in last 60 min (last {b:%H:%M} Athens), skip"); sys.exit(0)
+        if not manual and st.get("status_bar") == b.isoformat(): print(f"already sent for {b:%F %H:%M} Athens, skip"); sys.exit(0)
         a = analyze()
-        if a["age"] > 3600: print(f"data stale ({a['age']:.0f}s), skip")
-        else: a["msg"] = with_structure(a); send_analysis(a); print("SENT OK")
+        if a["age"] > 3600 and not manual: print(f"data stale ({a['age']:.0f}s), skip")
+        elif "--dry" in sys.argv: print(with_structure(a)); print("DRY RUN, not sent")
+        else:
+            a["msg"] = with_structure(a); send_analysis(a); print("SENT OK")
+            save(SP, {"status_bar": b.isoformat()})
     else:
         a = analyze(); a["msg"] = with_structure(a); print(a["msg"]); send_analysis(a)
