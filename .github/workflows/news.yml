@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -21,4 +22,12 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12', cache: pip }
       - run: pip install -q -r requirements.txt
-      - run: python news.py
+      - name: Skip if already sent today
+        id: dup
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          today=$(TZ=Europe/Istanbul date +%F)
+          n=$(gh run list -R ${{ github.repository }} -w news.yml -s success -L 10 --json createdAt -q '.[].createdAt' | while read t; do TZ=Europe/Istanbul date -d "$t" +%F; done | grep -c "^$today$" || true)
+          echo "n=$n" >> $GITHUB_OUTPUT
+      - if: steps.dup.outputs.n == '0' || github.event_name == 'workflow_dispatch'
+        run: python news.py
