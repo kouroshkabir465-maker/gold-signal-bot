@@ -130,7 +130,7 @@ def checks(r, tf, side, strict=STRICT):
         c.append((f"RSI {'بالای' if b else 'زیر'} مووینگ ۹", r.mapos == side))
     if strict and tf == "4h":
         c += [x for f, x in [("dist", (f"فاصلهٔ کافی از ابر (≥{CLOUD_DIST_ATR} ATR)", r.cloud == side and r.cloud_dist >= CLOUD_DIST_ATR)),
-              ("chikou", ("چیکو (خط تأخیری) تأیید می‌کنه", r.chikou == side)),
+              ("chikou", ("چیکو (خط تأخیری) " + ("تأیید می‌کنه" if r.chikou == side else "تأیید نمی‌کنه"), r.chikou == side)),
               ("fut", ("ابر آینده هم‌جهت", r.fut == side))] if f in FILTERS]
     if strict and tf == "15m":
         c += [x for f, x in [("rsi_ext", ("RSI اشباع نیست" + (" (&lt;۷۵)" if b else " (&gt;۲۵)"), r.rsi < RSI_MAX_BUY if b else r.rsi > RSI_MIN_SELL)),
