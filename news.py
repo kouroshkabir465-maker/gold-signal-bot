@@ -130,6 +130,40 @@ def build():
         body = "\n".join(lines) + "\n\n🔥🔥 = خیلی مهم (معمولاً نوسان شدید طلا)\n" + "⚠️ حوالی زمان این اخبار با احتیاط معامله کن."
     return head + body
 
+FA_DAYS = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"]
+
+def _line(t, e, day=False):
+    star = "🔥🔥 " if any(k.lower() in e["title"].lower() for k in TOP) else "🔴 "
+    when = (f"{FA_DAYS[t.weekday()]} " if day else "") + f"{t:%H:%M}"
+    fp = []
+    if e.get("forecast"): fp.append(f"پیش‌بینی: {html.escape(e['forecast'])}")
+    if e.get("previous"): fp.append(f"قبلی: {html.escape(e['previous'])}")
+    return f"{star}<b>{when}</b> — {html.escape(e['title'])}" + (f"\n      {' | '.join(fp)}" if fp else "")
+
+def build_calendar():
+    """On-demand calendar: today's high-impact USD news + rest of this week (next trading day if today empty)."""
+    now = dt.datetime.now(TZ); today = now.date()
+    rows = high_usd()
+    todays = [(t, e) for t, e, _ in rows if t.date() == today]
+    later = [(t, e) for t, e, _ in rows if t.date() > today]
+    out = [f"🗓 <b>تقویم اقتصادی — امروز {FA_DAYS[today.weekday()]} {today:%Y-%m-%d}</b>",
+           "فقط اخبار پراهمیت دلار که روی طلا اثر دارن (ساعت استانبول)", ""]
+    if todays:
+        out += [_line(t, e) for t, e in todays]
+    else:
+        out.append("✅ امروز" + (" (آخر هفته‌ست)" if today.weekday() >= 5 else "") + " خبر پراهمیتی نداریم.")
+        if later:
+            d = later[0][0].date()
+            out += ["", f"📌 <b>روز معاملاتی بعدی با خبر مهم: {FA_DAYS[d.weekday()]} {d:%m-%d}</b>"]
+            out += [_line(t, e) for t, e in later if t.date() == d]
+            later = [(t, e) for t, e in later if t.date() != d]
+    if later:
+        out += ["", "📅 <b>بقیه‌ی هفته:</b>"] + [_line(t, e, day=True) for t, e in later]
+    if not later and today.weekday() >= 4:
+        out += ["", "ℹ️ تقویم هفته‌ی بعد معمولاً آخر هفته منتشر میشه؛ دوشنبه دوباره «تقویم» بزن."]
+    out += ["", "🔥🔥 = خیلی مهم | ⚠️ حوالی این ساعت‌ها با احتیاط معامله کن."]
+    return "\n".join(out)
+
 def main():
     msg = build()
     print(msg)
