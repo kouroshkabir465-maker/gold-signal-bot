@@ -20,6 +20,7 @@ HELP = ("🤖 <b>راهنمای ربات طلا</b>\n\n"
 DRY = "--dry" in sys.argv
 def send(method, **kw):
     if DRY: print("DRY", method, (kw.get("data") or {}).get("text") or (kw.get("data") or {}).get("caption") or ""); return {"ok": True}
+    if method == "sendMessage" and "data" in kw: kw["data"] = {"reply_markup": gs.KB, **kw["data"]}
     return requests.post(f"{API}/{method}", timeout=60, **kw).json()
 
 def reply(chat, text):

@@ -6,6 +6,7 @@ TZ = ZoneInfo("Europe/Istanbul")
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read()).split(",") if c.strip()]
 CHAT_ID = CHAT_IDS[0]
+KB = '{"keyboard": [[{"text": "🔍 بررسی کن"}]], "resize_keyboard": true, "is_persistent": true}'
 URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 TOP = ("Non-Farm", "CPI", "FOMC", "Federal Funds", "Powell", "GDP", "PCE", "Unemployment Rate", "Retail Sales", "PPI", "ISM")
 
@@ -171,7 +172,7 @@ def main():
     if "--dry" in sys.argv: return
     for i, c in enumerate(CHAT_IDS):
         j = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", timeout=30,
-                          data={"chat_id": c, "text": msg, "parse_mode": "HTML"}).json()
+                          data={"chat_id": c, "text": msg, "parse_mode": "HTML", "reply_markup": KB}).json()
         if not j.get("ok"):
             if i == 0: raise SystemExit(f"Telegram failed: {j.get('description')}")
             print(f"extra chat send failed: {j.get('description')}")
