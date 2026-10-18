@@ -18,7 +18,8 @@ news = importlib.util.module_from_spec(_ns); _ns.loader.exec_module(news)
 
 TZ = ZoneInfo("Europe/Istanbul")
 CHART = os.path.join(HERE, "chart.png")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read().strip()
+CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read()).split(",") if c.strip()]
+CHAT_ID = CHAT_IDS[0]  # owner; extra ids (comma-separated secret) get a copy of every outgoing message
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 STATE = os.path.join(HERE, "state.json")
 TRADES = os.path.join(HERE, "trades.json")
@@ -238,13 +239,23 @@ def tg(method, **kw):
     j = requests.post(f"https://api.telegram.org/bot{TOKEN}/{method}", timeout=60, **kw).json()
     if not j.get("ok"): raise RuntimeError(f"Telegram {method} failed: {j.get('description')}")
 
-def say(text): tg("sendMessage", data={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"})
+def to_all(method, data, path=None):
+    """Send to owner (errors raise) and to extra chats (errors only logged)."""
+    for i, c in enumerate(CHAT_IDS):
+        try:
+            if path:
+                with open(path, "rb") as f: tg(method, data={**data, "chat_id": c}, files={"photo": f})
+            else: tg(method, data={**data, "chat_id": c})
+        except Exception as e:
+            if i == 0: raise
+            print(f"extra chat send failed: {e}")
+
+def say(text): to_all("sendMessage", {"text": text, "parse_mode": "HTML"})
 
 def send_analysis(a, path=None):
     plot(a["d4"], a["d15"], a["lv"], path)
     if not DRY:
-        with open(path or CHART, "rb") as f:
-            tg("sendPhoto", data={"chat_id": CHAT_ID, "caption": "چارت طلا: ۴ ساعته و ۱۵ دقیقه"}, files={"photo": f})
+        to_all("sendPhoto", {"caption": "چارت طلا: ۴ ساعته و ۱۵ دقیقه"}, path or CHART)
     say(a["msg"])
 
 # ---------------- state helpers ----------------
@@ -359,8 +370,7 @@ def headsup(st, a):
     try:
         p = os.path.join(HERE, "headsup.png"); plot(d4, d15, None, p)
         if not DRY:
-            with open(p, "rb") as f:
-                tg("sendPhoto", data={"chat_id": CHAT_ID, "caption": "چارت آماده‌باش: ۴ ساعته و ۱۵ دقیقه"}, files={"photo": f})
+            to_all("sendPhoto", {"caption": "چارت آماده‌باش: ۴ ساعته و ۱۵ دقیقه"}, p)
     except Exception as e: print(f"headsup chart failed: {e}")
     say(msg); print("HEADSUP SENT")
 

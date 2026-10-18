@@ -18,6 +18,7 @@ jobs:
       TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
       MPLCONFIGDIR: /tmp/mpl
       TG_TEXT: ${{ github.event.client_payload.text || inputs.text }}
+      TG_CHAT: ${{ github.event.client_payload.chat }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

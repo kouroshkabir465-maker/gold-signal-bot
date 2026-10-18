@@ -4,7 +4,8 @@ import os, sys, html, datetime as dt, requests
 from zoneinfo import ZoneInfo
 TZ = ZoneInfo("Europe/Istanbul")
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read().strip()
+CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read()).split(",") if c.strip()]
+CHAT_ID = CHAT_IDS[0]
 URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 TOP = ("Non-Farm", "CPI", "FOMC", "Federal Funds", "Powell", "GDP", "PCE", "Unemployment Rate", "Retail Sales", "PPI", "ISM")
 
@@ -168,9 +169,12 @@ def main():
     msg = build()
     print(msg)
     if "--dry" in sys.argv: return
-    j = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", timeout=30,
-                      data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}).json()
-    if not j.get("ok"): raise SystemExit(f"Telegram failed: {j.get('description')}")
+    for i, c in enumerate(CHAT_IDS):
+        j = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", timeout=30,
+                          data={"chat_id": c, "text": msg, "parse_mode": "HTML"}).json()
+        if not j.get("ok"):
+            if i == 0: raise SystemExit(f"Telegram failed: {j.get('description')}")
+            print(f"extra chat send failed: {j.get('description')}")
     print("SENT OK")
 
 if __name__ == "__main__": main()

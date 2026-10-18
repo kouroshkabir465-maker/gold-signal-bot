@@ -9,6 +9,7 @@ nspec = importlib.util.spec_from_file_location("gold_news", os.path.join(HERE, "
 news = importlib.util.module_from_spec(nspec); nspec.loader.exec_module(news)
 API = f"https://api.telegram.org/bot{gs.TOKEN}"
 OWNER = int(gs.CHAT_ID)
+ALLOWED = {int(c) for c in gs.CHAT_IDS}
 OFFSET = os.path.join(HERE, "listener_offset.json")
 CHART = os.path.join(HERE, "chart_reply.png")
 HELP = ("🤖 <b>راهنمای ربات طلا</b>\n\n"
@@ -54,7 +55,7 @@ def main():
                 json.dump({"offset": off}, open(OFFSET, "w"))
                 m = u.get("message") or {}
                 chat = (m.get("chat") or {}).get("id")
-                if chat != OWNER: print(f"ignored chat {chat}", flush=True); continue
+                if chat not in ALLOWED: print(f"ignored chat {chat}", flush=True); continue
                 text = (m.get("text") or "").strip()
                 print(f"{time.strftime('%F %T')} msg: {text[:40]!r}", flush=True)
                 try: reply(chat, text)
@@ -69,6 +70,7 @@ def main():
 
 if __name__ == "__main__":
     if "--reply" in sys.argv:   # GitHub Actions reply.yml: message text comes from the dispatch payload (env TG_TEXT)
-        reply(OWNER, (os.environ.get("TG_TEXT") or "").strip())
+        c = int(os.environ.get("TG_CHAT") or OWNER)   # reply to whoever asked (must be an allowed chat)
+        reply(c if c in ALLOWED else OWNER, (os.environ.get("TG_TEXT") or "").strip())
     else:
         main()
