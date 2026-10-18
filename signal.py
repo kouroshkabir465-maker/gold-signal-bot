@@ -11,7 +11,7 @@ sys.path = [x for x in sys.path if os.path.abspath(x or ".") != HERE]
 import json, time, pickle, importlib.util, datetime as dt, requests, pandas as pd, numpy as np, yfinance as yf
 from zoneinfo import ZoneInfo
 import matplotlib; matplotlib.use("Agg")
-import mplfinance as mpf, matplotlib.pyplot as plt
+import mplfinance as mpf, matplotlib.pyplot as plt, html as _html
 
 _ns = importlib.util.spec_from_file_location("gold_news", os.path.join(HERE, "news.py"))
 news = importlib.util.module_from_spec(_ns); _ns.loader.exec_module(news)
@@ -58,7 +58,7 @@ def _td_get(interval, size):
         d.index = pd.to_datetime(d.pop("datetime")).dt.tz_localize("UTC")
         d = d.rename(columns=str.capitalize).astype(float).sort_index()
         if "Volume" not in d: d["Volume"] = 0.0
-        d = d[["Open","High","Low","Close","Volume"]]
+        d = drop_weekend(d[["Open","High","Low","Close","Volume"]])
         pickle.dump(d, open(cf, "wb")); return d
     except Exception as e:
         print("twelvedata failed:", e, file=sys.stderr)
@@ -68,6 +68,17 @@ def _yf(interval, period):
     d = yf.download("GC=F", interval=interval, period=period, progress=False, auto_adjust=False)
     if isinstance(d.columns, pd.MultiIndex): d.columns = d.columns.get_level_values(0)
     return d[["Open","High","Low","Close","Volume"]].dropna()
+
+NY = ZoneInfo("America/New_York")
+def market_closed(now=None):
+    """FX/gold weekend: Fri 17:00 -> Sun 18:00 New York (DST-safe)."""
+    t = (now or dt.datetime.now(dt.timezone.utc)).astimezone(NY)
+    return t.weekday() == 5 or (t.weekday() == 4 and t.hour >= 17) or (t.weekday() == 6 and t.hour < 18)
+
+def drop_weekend(d):
+    """Twelve Data returns synthetic flat bars during the weekend; MT5 has none. Drop them."""
+    if d is None or not len(d): return d
+    return d[[not market_closed(t.to_pydatetime()) for t in d.index]]
 
 MT_TZ = "Europe/Athens"   # MT5 broker server time (EET/EEST): 4H bars open 00/04/08/12/16/20 local
 
@@ -200,13 +211,13 @@ def analyze():
         v = f"⏳ <b>صبر کن</b> — روند ۴ ساعته {FA_DIR[dir4]}ه، ولی ۱۵ دقیقه هنوز آماده نیست: " + "، ".join(bad[:3]) + "."
     if bo:
         t, e, _ = bo[0]
-        v += f"\n\n📰⚠️ خبر مهم {e['title']} ساعت {t:%H:%M} — از ۳۰ دقیقه قبل تا ۱۵ دقیقه بعدش سیگنال جدید نمی‌دم."
+        v += f"\n\n📰⚠️ خبر مهم {_html.escape(e['title'], quote=False)} ساعت {t:%H:%M} — از ۳۰ دقیقه قبل تا ۱۵ دقیقه بعدش سیگنال جدید نمی‌دم."
     msg = (f"🪙 <b>تحلیل طلا</b> ({src})\n💰 قیمت: <b>{d15.Close.iloc[-1]:.2f}</b>\n\n"
            f"{block('📊 تایم ۴ ساعته (جهت)', d4, '4h', dir4)}\n\n{block('⏱ تایم ۱۵ دقیقه (ورود)', d15, '15m', dir15, dir4 or int(d4.iloc[-1].tk) or 1)}\n\n"
            f"<b>نتیجه:</b> {v}")
     age = (pd.Timestamp.now(tz="UTC") - d15.index[-1].tz_convert("UTC")).total_seconds()
     return dict(msg=msg, side=side, lv=lv, d4=d4, d15=d15, age=age, src=src, blackout=bo,
-                session=in_session(now), key=f"{side}|{d15.cross_id.iloc[-1]}|{d15.index[d15.cross_id == d15.cross_id.iloc[-1]][0]}")
+                session=in_session(now), key=f"{side}|{d15.index[d15.cross_id == d15.cross_id.iloc[-1]][0]}")
 
 # ---------------- chart ----------------
 def plot(d4, d15, lv=None, path=None):
@@ -283,7 +294,7 @@ def news_alerts(st):
         if not (0 < mins <= 35) or not new: continue
         lines = [f"📰⚠️ <b>{'🔥 ' if any(tp for _, tp in evs) else ''}{'خبر' if len(evs) == 1 else f'{len(evs)} خبر'} مهم دلار تا {int(mins)} دقیقه دیگه</b> (⏰ {t:%H:%M})"]
         for e, top in evs:
-            lines.append(f"\n{'🔥 ' if top else '• '}<b>{e['title']}</b>" + (f"\n   {_fp(e)}" if _fp(e) else ""))
+            lines.append(f"\n{'🔥 ' if top else '• '}<b>{_html.escape(e['title'], quote=False)}</b>" + (f"\n   {_html.escape(_fp(e), quote=False)}" if _fp(e) else ""))
         lines.append(f"\nطلا ممکنه نوسان شدید داشته باشه. از ۳۰ دقیقه قبل تا ۱۵ دقیقه بعد سیگنال جدید نمی‌دم؛ اگه معامله باز داری، حد ضررت رو چک کن.")
         say("\n".join(lines))
         sent.update(f"{e['title']}|{e['date']}" for e, _ in evs)
@@ -345,7 +356,7 @@ def track(d15):
                 t.update(status="closed", closed_at=str(ts), R=1.5)
                 say(f"🏆 سیگنال {name} از {t['entry']:.2f}: <b>تارگت ۲ ({t['tp2']:.2f}) خورد</b> (+2R روی نیمهٔ دوم، +1.5R در کل).")
                 break
-            t["last_checked"] = str(ts)
+            if ts + pd.Timedelta(minutes=15) <= pd.Timestamp.now(tz="UTC"): t["last_checked"] = str(ts)  # forming bar re-checked next run
     save(TRADES, trades)
 
 def headsup(st, a):
@@ -377,6 +388,7 @@ def headsup(st, a):
     say(msg); print("HEADSUP SENT")
 
 def watch():
+    if market_closed(): print("market closed (weekend), skip"); return
     st = load(STATE, {})
     news_alerts(st); save(STATE, st)
     a = analyze()

@@ -5,6 +5,13 @@ const CAPTURE_USER = "younesi1233";    // unknown chat with this username -> log
 const REPO = "kouroshkabir465-maker/gold-signal-bot";
 
 export default {
+  // Cloudflare Cron Trigger: on-time dispatch (GitHub's own cron is often 10-30 min late or skipped; it stays as backup)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(fetch("https://api.github.com/repos/kouroshkabir465-maker/gold-signal-bot/actions/workflows/watcher.yml/dispatches", {
+      method: "POST", body: JSON.stringify({ ref: "main" }),
+      headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: "application/vnd.github+json", "user-agent": "gold-bot-worker", "content-type": "application/json" },
+    }).then(r => console.log("dispatch", r.status)));
+  },
   async fetch(req, env, ctx) {
     if (req.method !== "POST") return new Response("ok");
     if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET)

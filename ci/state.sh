@@ -1,7 +1,8 @@
 #!/bin/bash
 # Persist bot state files on a separate 'state' branch.  usage: ci/state.sh pull|push
 set -e
-FILES="${STATE_FILES:-state.json trades.json listener_offset.json heartbeat.txt status.json}"
+# status.json is handled only by status.yml (STATE_FILES=status.json) to avoid watcher/status races
+FILES="${STATE_FILES:-state.json trades.json heartbeat.txt}"
 if [ "$1" = pull ]; then
   if git fetch -q origin state 2>/dev/null; then
     for f in $FILES; do git show origin/state:$f > $f 2>/dev/null || rm -f $f; done

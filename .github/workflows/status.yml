@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12', cache: pip }
       - run: pip install -q -r requirements.txt
-      - run: ci/state.sh pull
+      - run: STATE_FILES=status.json ci/state.sh pull
       - run: python signal.py --status
       - if: always()
         run: STATE_FILES=status.json ci/state.sh push

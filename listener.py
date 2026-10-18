@@ -24,10 +24,8 @@ def send(method, **kw):
     return requests.post(f"{API}/{method}", timeout=60, **kw).json()
 
 def gold_closed(now=None):
-    """Broker weekend: Fri 24:00 -> Mon 01:00 Istanbul (= Fri 21:00 -> Sun 22:00 UTC)."""
-    import datetime as dt
-    t = now or dt.datetime.now(dt.timezone.utc)
-    return t.weekday() == 5 or (t.weekday() == 4 and t.hour >= 21) or (t.weekday() == 6 and t.hour < 22)
+    """Broker weekend: Fri 17:00 -> Sun 18:00 New York (DST-safe; = Sat 00:00 -> Mon 01:00 Istanbul in summer)."""
+    return gs.market_closed(now)
 
 def reply(chat, text):
     if text.startswith("/help"):
