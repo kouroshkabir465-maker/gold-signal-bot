@@ -23,6 +23,12 @@ def send(method, **kw):
     if method == "sendMessage" and "data" in kw: kw["data"] = {"reply_markup": gs.KB, **kw["data"]}
     return requests.post(f"{API}/{method}", timeout=60, **kw).json()
 
+def gold_closed(now=None):
+    """Broker weekend: Fri 24:00 -> Mon 01:00 Istanbul (= Fri 21:00 -> Sun 22:00 UTC)."""
+    import datetime as dt
+    t = now or dt.datetime.now(dt.timezone.utc)
+    return t.weekday() == 5 or (t.weekday() == 4 and t.hour >= 21) or (t.weekday() == 6 and t.hour < 22)
+
 def reply(chat, text):
     if text.startswith("/help"):
         send("sendMessage", data={"chat_id": chat, "text": HELP, "parse_mode": "HTML"}); return
@@ -32,9 +38,11 @@ def reply(chat, text):
     send("sendChatAction", data={"chat_id": chat, "action": "typing"})
     a = gs.analyze()
     msg = gs.with_structure(a)
-    if a["age"] > 3600:
+    if gold_closed():
+        msg = "⛔ <b>بازار تعطیله، این تحلیل با آخرین قیمت جمعه‌ست</b>\n\n" + msg
+    elif a["age"] > 3600:
         msg = "🌙 <b>الان بازار طلا بسته‌ست</b> (یا داده تازه نیست)؛ این تحلیل مربوط به آخرین قیمت قبل از تعطیلیه.\n\n" + msg
-    if a["age"] <= 3600 and not a.get("session", True):
+    if a["age"] <= 3600 and not gold_closed() and not a.get("session", True):
         msg = "🕐 الان خارج از سشن لندن/نیویورک (۱۰:۰۰ تا ۰۰:۰۰ استانبول) هستیم؛ ربات خودکار این ساعت‌ها سیگنال نمی‌فرسته، این فقط تحلیل لحظه‌ایه.\n\n" + msg
     if text.startswith("/start"):
         msg = "سلام کوروش! 👋\n\n" + msg
