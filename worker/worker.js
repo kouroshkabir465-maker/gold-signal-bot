@@ -1,6 +1,6 @@
 // Telegram webhook -> instant ack + GitHub repository_dispatch (reply.yml)
 const OWNER = 8561650547;
-const EXTRA = [];                      // other allowed chats (user's second account), filled after capture
+const EXTRA = [5728075440];                      // other allowed chats (user's second account), filled after capture
 const CAPTURE_USER = "younesi1233";    // unknown chat with this username -> logged via market-scanner chat_seen.yml
 const REPO = "kouroshkabir465-maker/gold-signal-bot";
 
