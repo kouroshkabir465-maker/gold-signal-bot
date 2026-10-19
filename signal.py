@@ -136,7 +136,7 @@ def checks(r, tf, side, strict=STRICT):
     cl = {1: "بالای ابر", -1: "زیر ابر"}.get(int(r.cloud), "داخل ابر")
     tkl = "تنکن بالای کیجون" if r.tk > 0 else ("تنکن زیر کیجون" if r.tk < 0 else "تنکن روی کیجون")
     c = [(tkl + (" (لازم: " + ("بالای" if b else "زیر") + ")" if r.tk != side else ""), r.tk == side),
-         ("قیمت " + cl + (" (لازم: " + ("بالای" if b else "زیر") + " ابر)" if r.cloud != side else ""), r.cloud == side),
+         ("قیمت " + cl + (" ۴ ساعته" if tf == "4h" else " ۱۵ دقیقه") + f" (ابر {min(r.spanA, r.spanB):.2f}–{max(r.spanA, r.spanB):.2f})" + (" (لازم: " + ("بالای" if b else "زیر") + " ابر)" if r.cloud != side else ""), r.cloud == side),
          (f"RSI {r.rsi:.1f}" + (f" (لازم: {'بالای ۵۵' if b else 'زیر ۴۵'})" if not (r.rsi > 55 if b else r.rsi < 45) else f" {'بالای ۵۵' if b else 'زیر ۴۵'}"), r.rsi > 55 if b else r.rsi < 45)]
     if tf == "15m":
         c.append((f"RSI {'بالای' if b else 'زیر'} مووینگ ۹", r.mapos == side))
@@ -399,12 +399,13 @@ def watch():
     if a["age"] > 3600: print("data stale / market closed"); return
     try: headsup(st, a)
     except Exception as e: print(f"headsup failed: {e}")
-    key = a["key"] if a["side"] else "none"
-    if key == st.get("key"): return
-    if a["side"] and not a["session"]: print("signal held: outside session"); return
-    if a["side"] and a["blackout"]: print("signal held: news blackout"); return
-    st["key"] = key; save(STATE, st)
+    # dedupe: remember only the last *sent* signal key; a flip to no-signal must not re-arm the same signal
     if not a["side"]: return
+    key = a["key"]
+    if key == st.get("key"): print("signal already sent for this key, skip"); return
+    if not a["session"]: print("signal held: outside session"); return
+    if a["blackout"]: print("signal held: news blackout"); return
+    st["key"] = key; save(STATE, st)
     send_analysis(a)
     st.setdefault("sig4", {})[str(a["side"])] = str(a["d4"].index[-1]); save(STATE, st)
     lv = a["lv"]; trades = load(TRADES, [])
