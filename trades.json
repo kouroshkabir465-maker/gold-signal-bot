@@ -11,7 +11,7 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-10-19 03:30:00+00:00"
+  "last_checked": "2026-10-19 03:45:00+00:00"
  },
  {
   "id": 2,
@@ -25,7 +25,7 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-10-19 03:30:00+00:00"
+  "last_checked": "2026-10-19 03:45:00+00:00"
  },
  {
   "id": 3,
@@ -39,7 +39,7 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-10-19 03:30:00+00:00"
+  "last_checked": "2026-10-19 03:45:00+00:00"
  },
  {
   "id": 4,
@@ -53,7 +53,7 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-10-19 03:30:00+00:00"
+  "last_checked": "2026-10-19 03:45:00+00:00"
  },
  {
   "id": 5,
@@ -66,7 +66,8 @@
   "tp2": 4212.214705986009,
   "src": "XAU/USD · Twelve Data",
   "status": "open",
-  "tp1_hit": false
+  "tp1_hit": false,
+  "last_checked": "2026-10-19 03:45:00+00:00"
  },
  {
   "id": 6,
