@@ -196,7 +196,7 @@ def analyze():
     now = dt.datetime.now(TZ)
     bo = news.blackout(now)
     if side:
-        v = ("🟢 <b>خرید (BUY)</b>" if side > 0 else "🔴 <b>فروش (SELL)</b>") + " — همهٔ فیلترها تأیید شد."
+        v = ("\u200f🟢 <b>BUY</b>" if side > 0 else "\u200f🔴 <b>SELL</b>") + " — همهٔ فیلترها تأیید شد."
         if recent(d15.tk, side): v += " ⚡ کراس تازه روی ۱۵ دقیقه."
         if recent(d15.mapos, side): v += " ⚡ کراس تازهٔ RSI/MA9."
         v += (f"\n\n🎯 <b>ورود:</b> {lv['entry']:.2f}\n🛑 <b>حد ضرر:</b> {lv['sl']:.2f}\n"
@@ -339,7 +339,7 @@ def track(d15):
         s = 1 if t["side"] > 0 else -1
         bars = d15[d15.index > pd.Timestamp(t["bar"])]
         if t.get("last_checked"): bars = bars[bars.index > pd.Timestamp(t["last_checked"])]
-        name = "خرید" if s > 0 else "فروش"
+        name = "BUY" if s > 0 else "SELL"
         for ts, b in bars.iterrows():
             lo, hi = b.Low, b.High
             stop = t["entry"] if t["tp1_hit"] else t["sl"]
@@ -370,7 +370,7 @@ def headsup(st, a):
     c4 = str(d4.index[-1]); k = str(dir4)
     if st.get("headsup", {}).get(k) == c4 or st.get("sig4", {}).get(k) == c4: return
     price = d15.Close.iloc[-1]
-    msg = (f"⚡️ <b>آماده‌باش {'خرید' if dir4 > 0 else 'فروش'}</b> — روند ۴ ساعته {'صعودی' if dir4 > 0 else 'نزولی'}ه و ۱۵ دقیقه نزدیک ورود.\n"
+    msg = (f"⚡️ <b>آماده‌باش {'BUY' if dir4 > 0 else 'SELL'}</b> — روند ۴ ساعته {'صعودی' if dir4 > 0 else 'نزولی'}ه و ۱۵ دقیقه نزدیک ورود.\n"
            f"مونده: {'، '.join(c[i][0] for i in bad)}\nقیمت: <b>{price:.2f}</b>\n"
            "احتمالاً تو ۱۵ تا ۳۰ دقیقه آینده سیگنال میاد؛ آماده باش.")
     try:
