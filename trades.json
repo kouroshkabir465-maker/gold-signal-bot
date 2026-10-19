@@ -11,6 +11,19 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-10-19 04:30:00+00:00"
+  "last_checked": "2026-10-19 04:45:00+00:00"
+ },
+ {
+  "id": 2,
+  "side": 1,
+  "time": "2026-10-19 08:02:19.150036+03:00",
+  "bar": "2026-10-19 05:00:00+00:00",
+  "entry": 4182.99021,
+  "sl": 4163.0565500425,
+  "tp1": 4202.9238699575,
+  "tp2": 4222.857529915,
+  "src": "XAU/USD · Twelve Data",
+  "status": "open",
+  "tp1_hit": false
  }
 ]
