@@ -245,7 +245,7 @@ def plot(d4, d15, lv=None, path=None):
 
 # ---------------- telegram ----------------
 DRY = "--dry" in sys.argv
-KB = json.dumps({"keyboard": [[{"text": "🔍 بررسی کن"}]], "resize_keyboard": True, "is_persistent": True})
+KB = json.dumps({"keyboard": [[{"text": "🔍 بررسی کن"}, {"text": "📅 تقویم"}]], "resize_keyboard": True, "is_persistent": True})
 def tg(method, **kw):
     if DRY: print(f"[dry] {method}: {str(kw.get("data", {}).get("text", ""))}"); return
     if method == "sendMessage" and "data" in kw: kw["data"] = {"reply_markup": KB, **kw["data"]}  # persistent «🔍 بررسی کن» button

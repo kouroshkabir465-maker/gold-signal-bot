@@ -6,7 +6,7 @@ TZ = ZoneInfo("Europe/Istanbul")
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read()).split(",") if c.strip()]
 CHAT_ID = CHAT_IDS[0]
-KB = '{"keyboard": [[{"text": "🔍 بررسی کن"}]], "resize_keyboard": true, "is_persistent": true}'
+KB = '{"keyboard": [[{"text": "🔍 بررسی کن"}, {"text": "📅 تقویم"}]], "resize_keyboard": true, "is_persistent": true}'
 URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 TOP = ("Non-Farm", "CPI", "FOMC", "Federal Funds", "Powell", "GDP", "PCE", "Unemployment Rate", "Retail Sales", "PPI", "ISM")
 
@@ -134,36 +134,73 @@ def build():
 
 FA_DAYS = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"]
 
-def _line(t, e, day=False):
-    star = "🔥🔥 " if any(k.lower() in e["title"].lower() for k in TOP) else "🔴 "
-    when = (f"{FA_DAYS[t.weekday()]} " if day else "") + f"{t:%H:%M}"
+FA_NAMES = [("core cpi", "تورم هسته (CPI هسته)"), ("cpi", "تورم مصرف‌کننده (CPI)"), ("core pce", "تورم هسته PCE"),
+            ("pce", "شاخص قیمت PCE"), ("core ppi", "تورم هسته تولیدکننده"), ("ppi", "تورم تولیدکننده (PPI)"),
+            ("adp non-farm", "اشتغال بخش خصوصی ADP"), ("non-farm", "اشتغال غیرکشاورزی (NFP)"),
+            ("unemployment claims", "مدعیان بیکاری هفتگی"), ("unemployment rate", "نرخ بیکاری"),
+            ("average hourly earnings", "میانگین دستمزد ساعتی"), ("federal funds rate", "تصمیم نرخ بهره فدرال رزرو"),
+            ("fomc statement", "بیانیه فدرال رزرو"), ("fomc press conference", "کنفرانس خبری فدرال رزرو"),
+            ("fomc meeting minutes", "صورتجلسه فدرال رزرو"), ("fomc economic projections", "پیش‌بینی‌های اقتصادی فدرال رزرو"),
+            ("powell", "سخنرانی پاول (رئیس فدرال رزرو)"), ("gdp", "تولید ناخالص داخلی (GDP)"),
+            ("core retail sales", "خرده‌فروشی هسته"), ("retail sales", "خرده‌فروشی"),
+            ("ism manufacturing", "شاخص تولید ISM"), ("ism services", "شاخص خدمات ISM"),
+            ("jolts", "فرصت‌های شغلی JOLTS"), ("consumer confidence", "اعتماد مصرف‌کننده"),
+            ("consumer sentiment", "احساسات مصرف‌کننده (میشیگان)"), ("inflation expectations", "انتظارات تورمی"),
+            ("durable goods", "سفارش کالاهای بادوام"), ("speaks", "سخنرانی مقام فدرال رزرو"),
+            ("treasury", "خزانه‌داری آمریکا"), ("trade balance", "تراز تجاری"), ("pmi", "شاخص مدیران خرید (PMI)"),
+            ("home sales", "فروش مسکن"), ("housing starts", "ساخت مسکن"), ("empire state", "شاخص تولید نیویورک"),
+            ("philly fed", "شاخص تولید فیلادلفیا")]
+
+def fa_name(title):
+    tl = title.lower()
+    for k, v in FA_NAMES:
+        if k in tl: return v
+    return None
+
+def _cal_line(t, e, now, day=False):
+    top = any(k.lower() in e["title"].lower() for k in TOP)
+    when = (f"{FA_DAYS[t.weekday()]} {t:%m-%d} " if day else "") + f"{t:%H:%M}"
+    fa = fa_name(e["title"])
+    name = f"{fa} ({html.escape(e['title'])})" if fa else html.escape(e["title"])
+    passed = " ✔️ گذشت" if not day and t < now else ""
     fp = []
     if e.get("forecast"): fp.append(f"پیش‌بینی: {html.escape(e['forecast'])}")
     if e.get("previous"): fp.append(f"قبلی: {html.escape(e['previous'])}")
-    return f"{star}<b>{when}</b> — {html.escape(e['title'])}" + (f"\n      {' | '.join(fp)}" if fp else "")
+    return f"🕐 <b>{when}</b> {'🔥🔥' if top else '🔥'} {name}{passed}" + (f"\n      {' | '.join(fp)}" if fp else "")
 
-def build_calendar():
-    """On-demand calendar: today's high-impact USD news + rest of this week (next trading day if today empty)."""
-    now = dt.datetime.now(TZ); today = now.date()
-    rows = high_usd()
-    todays = [(t, e) for t, e, _ in rows if t.date() == today]
-    later = [(t, e) for t, e, _ in rows if t.date() > today]
-    out = [f"🗓 <b>تقویم اقتصادی — امروز {FA_DAYS[today.weekday()]} {today:%Y-%m-%d}</b>",
-           "فقط اخبار پراهمیت دلار که روی طلا اثر دارن (ساعت استانبول)", ""]
+def build_calendar(now=None, ev=None):
+    """On-demand calendar (reply to «تقویم» / «📅 تقویم»): today's high-impact USD news, Istanbul time, sorted."""
+    now = now or dt.datetime.now(TZ); today = now.date()
+    ev = events() if ev is None else ev
+    head = [f"🗓 <b>تقویم اقتصادی — {FA_DAYS[today.weekday()]} {today:%Y-%m-%d}</b>",
+            "فقط اخبار مهم دلار آمریکا که روی طلا اثر دارن (ساعت‌ها به وقت استانبول)", ""]
+    if not ev:   # feed down and no cache: never pretend "no news"
+        return "\n".join(head + ["⚠️ الان نتونستم تقویم اقتصادی رو بگیرم. چند دقیقه دیگه دوباره «📅 تقویم» رو بزن.",
+                                  "تا اون موقع حوالی ساعت‌های معمول خبر (۱۵:۳۰ و ۱۷:۰۰ استانبول) با احتیاط معامله کن."])
+    rows = []
+    for e in ev:
+        if e.get("country") != "USD" or e.get("impact") != "High": continue
+        try: rows.append((dt.datetime.fromisoformat(e["date"]).astimezone(TZ), e))
+        except Exception: continue
+    rows.sort(key=lambda x: x[0])
+    todays = [(t, e) for t, e in rows if t.date() == today]
+    upcoming = [(t, e) for t, e in rows if t.date() > today]
+    out = head
     if todays:
-        out += [_line(t, e) for t, e in todays]
+        out += ["⚠️ <b>اخبار مهم امروز:</b>", ""] + [_cal_line(t, e, now) for t, e in todays]
+        if all(t < now for t, _ in todays):
+            out += ["", "✅ همه‌ی خبرهای امروز گذشتن؛ از طرف خبر بقیه‌ی روز آرومه."]
+        else:
+            out += ["", "⛔ از حدود ۳۰ دقیقه قبل تا ۳۰ دقیقه بعد از این ساعت‌ها ورود جدید نزن.",
+                    "🔥🔥 = خیلی مهم (نوسان شدید)   🔥 = مهم"]
     else:
-        out.append("✅ امروز" + (" (آخر هفته‌ست)" if today.weekday() >= 5 else "") + " خبر پراهمیتی نداریم.")
-        if later:
-            d = later[0][0].date()
-            out += ["", f"📌 <b>روز معاملاتی بعدی با خبر مهم: {FA_DAYS[d.weekday()]} {d:%m-%d}</b>"]
-            out += [_line(t, e) for t, e in later if t.date() == d]
-            later = [(t, e) for t, e in later if t.date() != d]
-    if later:
-        out += ["", "📅 <b>بقیه‌ی هفته:</b>"] + [_line(t, e, day=True) for t, e in later]
-    if not later and today.weekday() >= 4:
-        out += ["", "ℹ️ تقویم هفته‌ی بعد معمولاً آخر هفته منتشر میشه؛ دوشنبه دوباره «تقویم» بزن."]
-    out += ["", "🔥🔥 = خیلی مهم | ⚠️ حوالی این ساعت‌ها با احتیاط معامله کن."]
+        out.append("✅ امروز" + (" (آخر هفته‌ست و بازار بسته‌ست)" if today.weekday() >= 5 else "")
+                   + " هیچ خبر مهمی برای دلار نداریم؛ از طرف خبر خیالت راحت.")
+        if upcoming:
+            t, e = upcoming[0]
+            out += ["", "📌 <b>خبر مهم بعدی:</b>", _cal_line(t, e, now, day=True)]
+        elif today.weekday() >= 4:
+            out += ["", "ℹ️ تقویم هفته‌ی بعد آخر هفته منتشر میشه؛ دوشنبه دوباره «📅 تقویم» رو بزن."]
     return "\n".join(out)
 
 def main():
