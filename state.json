@@ -9,7 +9,9 @@
  ],
  "post_alerted": [
   "FOMC Press Conference|2026-10-28T14:30:00-04:00",
-  "Fed Chairman Warsh Speaks|2026-10-15T23:30:00-04:00"
+  "FOMC Statement|2026-10-28T14:00:00-04:00",
+  "Fed Chairman Warsh Speaks|2026-10-15T23:30:00-04:00",
+  "Federal Funds Rate|2026-10-28T14:00:00-04:00"
  ],
  "headsup": {
   "1": "2026-10-18 21:00:00+00:00",
