@@ -233,8 +233,10 @@
   "tp1": 3898.4314064948685,
   "tp2": 3876.210462989737,
   "src": "XAU/USD · Twelve Data",
-  "status": "open",
+  "status": "closed",
   "tp1_hit": false,
-  "last_checked": "2026-11-04 01:00:00+00:00"
+  "last_checked": "2026-11-04 01:00:00+00:00",
+  "closed_at": "2026-11-04 01:15:00+00:00",
+  "R": -1.0
  }
 ]
