@@ -299,7 +299,7 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": true,
-  "last_checked": "2026-11-10 02:15:00+00:00"
+  "last_checked": "2026-11-10 02:30:00+00:00"
  },
  {
   "id": 20,
@@ -327,9 +327,11 @@
   "tp1": 4143.49980049173,
   "tp2": 4168.691430983458,
   "src": "XAU/USD · Twelve Data",
-  "status": "open",
+  "status": "closed",
   "tp1_hit": true,
-  "last_checked": "2026-11-10 02:15:00+00:00"
+  "last_checked": "2026-11-10 02:15:00+00:00",
+  "closed_at": "2026-11-10 02:30:00+00:00",
+  "R": 0.5
  },
  {
   "id": 22,
@@ -343,6 +345,6 @@
   "src": "XAU/USD · Twelve Data",
   "status": "open",
   "tp1_hit": false,
-  "last_checked": "2026-11-10 02:15:00+00:00"
+  "last_checked": "2026-11-10 02:30:00+00:00"
  }
 ]
