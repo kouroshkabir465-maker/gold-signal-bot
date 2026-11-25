@@ -95,6 +95,8 @@ def mt_hours(day):
     s, e = box_window(day); return f"{s.tz_convert(TZ):%H:%M} تا {e.tz_convert(TZ):%H:%M}"
 TREND = {1: "صعودی (بالای ابر)", -1: "نزولی (زیر ابر)", 0: "خنثی (داخل ابر)"}
 
+SRC_LINE = "\n\n📡 منبع داده: Twelve Data (XAU/USD اسپات). سقف و کف ممکنه چند دلار با بروکرت فرق داشته باشه؛ لبه‌ها رو روی چارت MT5 خودت چک کن."
+
 def box_text(box, day, late=False):
     import pandas as pd
     m = (f"🌏 <b>باکس سشن آسیا</b> ({day:%m-%d})\n"
@@ -106,6 +108,7 @@ def box_text(box, day, late=False):
         m += f"\n\n⚠️ <b>باکس پهنه</b> (بیشتر از {WIDE_USD:.0f} دلار): استاپ‌ها بزرگ‌ترن؛ ریسک ۰.۰۱ لات رو زیر {MAX_RISK_USD:.0f} دلار نگه دار."
     m += ("\n\n📤 بسته شدن کندل ۱۵ دقیقه بیرون باکس → سیگنال شکست با ورود روی پولبک\n"
           "🔄 شدو بیرون باکس و بسته شدن داخلش → سیگنال سویپ")
+    m += SRC_LINE
     if late: m += "\n(این پیام با تأخیر اومد چون داده دیر رسید.)"
     return m
 
@@ -126,29 +129,84 @@ def _lv_lines(lv, t1, t2):
             f"✅ <b>تارگت ۱{t1}:</b> {lv['tp1']:.2f}\n✅ <b>تارگت ۲{t2}:</b> {lv['tp2']:.2f}\n"
             f"📏 ریسک: {lv['risk']:.2f} دلار (۰.۰۱ لات ≈ {lv['risk']:.0f} دلار)")
 
+def quality(lv, box, tr):
+    """'بالا' only when H4-aligned AND box <= WIDE_USD AND risk <= MAX_RISK_USD."""
+    return "بالا" if (tr == lv["side"] and box["size"] <= WIDE_USD and lv["risk"] <= MAX_RISK_USD) else "پایین"
+
+def checklist(lv, box, tr):
+    h4 = ("✅" if tr == lv["side"] else "⚪️" if tr == 0 else "❌") + f" روند H4: {TREND[tr]}"
+    wd = ("✅" if box["size"] <= WIDE_USD else "❌") + f" عرض باکس: {box['size']:.0f} دلار" + ("" if box["size"] <= WIDE_USD else f" (بیشتر از {WIDE_USD:.0f}؛ سخت‌گیرتر باش)")
+    rk = ("✅" if lv["risk"] <= MAX_RISK_USD else "❌") + f" ریسک ۰.۰۱ لات: {lv['risk']:.0f} دلار (حداکثر {MAX_RISK_USD:.0f})"
+    q = quality(lv, box, tr)
+    return (f"\n\n<b>چک‌لیست فیلترها:</b>\n{h4}\n{wd}\n{rk}\n"
+            "☑️ قبل از ورود: کندل تأیید M15 و ناحیه‌ی فیبو ۶۲–۷۹ رو روی چارت MT5 خودت چک کن.\n\n"
+            + (f"⭐️ <b>کیفیت: بالا</b>" if q == "بالا" else "▫️ <b>کیفیت: پایین</b>"))
+
 def alert_text(kind, t, bar, box, lv, tr):
     import pandas as pd
     when = ist(t + pd.Timedelta(minutes=15))
+    side = "🟢 <b>BUY</b>" if lv["side"] > 0 else "🔴 <b>SELL</b>"
     if kind.startswith("brk"):
-        lv = lv or breakout_levels(kind, box); up = lv["side"] > 0
-        edge = "سقف" if up else "کف"
-        return ("\u200f" + ("🟢 <b>BUY</b>" if up else "🔴 <b>SELL</b>") + f" — شکست {edge} باکس آسیا\n"
-                f"کندل ۱۵ دقیقه ({ist(t)}–{when}) {'بالای' if up else 'زیر'} {edge} {lv['entry']:.2f} بسته شد: <b>{bar.Close:.2f}</b>\n"
-                f"{align(lv['side'], tr)}\n\n"
-                f"📌 <b>نوع سفارش:</b> {'Buy Limit' if up else 'Sell Limit'} روی پولبک به {edge} باکس\n"
+        up = lv["side"] > 0; edge = "سقف" if up else "کف"
+        return ("\u200f📍 <b>قیمت رسید به لبه‌ی باکس آسیا</b> — شکست " + edge + " — " + side + "\n"
+                f"کندل ۱۵ دقیقه ({ist(t)}–{when}) {'بالای' if up else 'زیر'} {edge} {lv['entry']:.2f} بسته شد: <b>{bar.Close:.2f}</b>\n\n"
+                f"📌 <b>سفارش:</b> {'Buy Limit' if up else 'Sell Limit'} روی پولبک به {edge} باکس\n"
                 + _lv_lines(lv, " (1R)", " (2R)") +
-                f"\n\n❌ ابطال: اگه قبل از پولبک کندل ۱۵ دقیقه دوباره داخل باکس بسته شد، یا تا آخر امروز پر نشد، سفارش رو پاک کن.\n"
-                f"باکس: {box['bot']:.2f} – {box['top']:.2f} ({box['size']:.0f} دلار)")
+                f"\n❌ ابطال: اگه قبل از پولبک کندل ۱۵ دقیقه دوباره داخل باکس بسته شد، یا تا آخر امروز پر نشد، سفارش رو پاک کن."
+                + checklist(lv, box, tr) + f"\n\nباکس: {box['bot']:.2f} – {box['top']:.2f}")
     b = lv["side"] > 0
-    m = ("\u200f" + ("🟢 <b>BUY</b>" if b else "🔴 <b>SELL</b>") + f" — سویپ {'کف' if b else 'سقف'} باکس آسیا\n"
+    m = ("\u200f📍 <b>قیمت رسید به لبه‌ی باکس آسیا</b> — سویپ " + ("کف" if b else "سقف") + " — " + side + "\n"
          f"کندل ۱۵ دقیقه ({ist(t)}–{when}) شدو زد {'زیر کف' if b else 'بالای سقف'} {box['bot' if b else 'top']:.2f} "
-         f"(تا {bar.Low if b else bar.High:.2f}) و داخل باکس بسته شد.\n{align(lv['side'], tr)}\n\n"
-         f"📌 <b>نوع سفارش:</b> {'Buy' if b else 'Sell'} Market (قیمت بسته شدن کندل)\n"
+         f"(تا {bar.Low if b else bar.High:.2f}) و داخل باکس بسته شد.\n\n"
+         f"📌 <b>سفارش:</b> {'Buy' if b else 'Sell'} Market (قیمت بسته شدن کندل)\n"
          + _lv_lines(lv, " (وسط باکس)", f" ({'سقف' if b else 'کف'} باکس)") +
          f"\n⚖️ ریسک به ریوارد: ۱:{abs(lv['tp1'] - lv['entry']) / lv['risk']:.1f} تا ۱:{abs(lv['tp2'] - lv['entry']) / lv['risk']:.1f}")
-    if lv["risk"] > MAX_RISK_USD: m += f"\n⚠️ ریسک بیشتر از {MAX_RISK_USD:.0f} دلاره؛ طبق قانونت حجم رو کم کن یا رد کن."
     if (lv["tp1"] - lv["entry"]) * lv["side"] <= 0: m += "\n⚠️ قیمت از وسط باکس رد شده؛ فقط تارگت ۲ معتبره."
-    return m
+    return m + checklist(lv, box, tr) + f"\n\nباکس: {box['bot']:.2f} – {box['top']:.2f}"
+
+# ---------------- journal (outcome tracking; shared with backtest) ----------------
+JOURNAL = os.path.join(HERE, "asia_journal.json")
+JOURNAL_MAX, JOURNAL_EXPIRE_D = 600, 5
+
+def journal_entry(kind, t, box, lv, tr):
+    return dict(id=f"{box['day']}|{kind}", day=box["day"], kind=kind, dir="BUY" if lv["side"] > 0 else "SELL",
+                bar=str(t), entry=round(lv["entry"], 2), sl=round(lv["sl"], 2), tp1=round(lv["tp1"], 2), tp2=round(lv["tp2"], 2),
+                risk=round(lv["risk"], 2), h4=int(tr), box_top=round(box["top"], 2), box_bot=round(box["bot"], 2),
+                box_size=round(box["size"], 2), quality=quality(lv, box, tr),
+                status="pending" if kind.startswith("brk") else "open", filled_at=None if kind.startswith("brk") else str(t), result_at=None)
+
+def resolve(j, m15, now):
+    """Update one journal entry from CLOSED M15 bars. Breakout: limit fill on retest before a close back inside,
+    else 'not filled' at MT day end. Then TP1 vs SL (SL first if one bar touches both). Returns True if changed."""
+    import pandas as pd
+    if j["status"] not in ("pending", "open"): return False
+    s = 1 if j["dir"] == "BUY" else -1
+    day = dt.date.fromisoformat(j["day"])
+    day_end = pd.Timestamp(dt.datetime.combine(day + dt.timedelta(days=1), dt.time(), MT)).tz_convert("UTC")
+    start = pd.Timestamp(j["filled_at"] or j["bar"])
+    bars = m15[(m15.index > start) & (m15.index + pd.Timedelta(minutes=15) <= now)]
+    old = j["status"]
+    for t, b in bars.iterrows():
+        if j["status"] == "pending":
+            if t >= day_end: j.update(status="not filled", result_at=str(t)); break
+            if (s > 0 and b.Low <= j["entry"]) or (s < 0 and b.High >= j["entry"]): j.update(status="open", filled_at=str(t))
+            elif (s > 0 and b.Close < j["box_top"]) or (s < 0 and b.Close > j["box_bot"]): j.update(status="not filled", result_at=str(t)); break
+            else: continue
+        if (s > 0 and b.Low <= j["sl"]) or (s < 0 and b.High >= j["sl"]): j.update(status="SL", result_at=str(t)); break
+        if (s > 0 and b.High >= j["tp1"]) or (s < 0 and b.Low <= j["tp1"]): j.update(status="TP1", result_at=str(t)); break
+    if j["status"] in ("pending", "open") and now - pd.Timestamp(j["bar"]) > pd.Timedelta(days=JOURNAL_EXPIRE_D):
+        j.update(status="expired", result_at=str(now))
+    return j["status"] != old
+
+def weekly_line(journal, now):
+    """Last 7 days: TP1/SL counts, all alerts and 'quality high' only. '' if nothing resolved."""
+    import pandas as pd
+    js = [j for j in journal if now - pd.Timestamp(j["bar"]) <= pd.Timedelta(days=7)]
+    f = lambda xs, st: sum(j["status"] == st for j in xs)
+    hi = [j for j in js if j["quality"] == "بالا"]
+    if not (f(js, "TP1") + f(js, "SL")): return ""
+    return (f"\n\n📒 ژورنال ۷ روز گذشته: همه {f(js, 'TP1')} تارگت ۱ / {f(js, 'SL')} استاپ"
+            f" | کیفیت بالا {f(hi, 'TP1')} / {f(hi, 'SL')}")
 
 # ---------------- live ----------------
 def _gs():
@@ -175,25 +233,46 @@ def broadcast(gs, text):
         if prefs.get(str(c), True): _post(gs, c, text)
         else: print("asia alerts off for one chat, skipped")
 
+def _journal_update(m15, now):
+    try:
+        jr = load(JOURNAL, [])
+        if any([resolve(j, m15, now) for j in jr]): save(JOURNAL, jr[-JOURNAL_MAX:])
+    except Exception as ex: print(f"asia journal update failed: {ex}")
+
+def _journal_add(kind, t, box, lv, tr):
+    try:
+        jr = load(JOURNAL, []); e = journal_entry(kind, t, box, lv, tr)
+        if all(j["id"] != e["id"] for j in jr): jr.append(e); save(JOURNAL, jr[-JOURNAL_MAX:])
+    except Exception as ex: print(f"asia journal add failed: {ex}")
+
 def watch():
     import pandas as pd
     gs = _gs()
     now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(MT).date()
     if gs.market_closed(now.to_pydatetime()): print("asia: market closed, skip"); return
     _, e = box_window(today)
-    if now < e: print("asia: before 10:00 Istanbul, nothing to do"); return
-    d4, m15, src = _data(gs)
+    pending = any(j.get("status") in ("pending", "open") for j in load(JOURNAL, []))
+    if now < e and not pending: print("asia: before 10:00 chart time, nothing to do"); return
+    d4, m15, src = _data(gs)          # same cached Twelve Data frames the watcher step just fetched (no extra API calls)
     if m15 is None: print(f"asia: no Twelve Data ({src}), skip"); return
+    _journal_update(m15, now)
+    if now < e: return
     st = load(STATE, {})
     if st.get("day") != str(today): st = {"day": str(today), "alerts": [], "last_bar": None}
     closed = m15[m15.index + pd.Timedelta(minutes=15) <= now]
     if not st.get("box"):
         if not len(closed) or closed.index[-1] < e - pd.Timedelta(minutes=15):
-            print("asia: 09:45 bar not in data yet, retry next run"); return
+            print("asia: last box bar not in data yet, retry next run"); return
+        if (now - (closed.index[-1] + pd.Timedelta(minutes=15))).total_seconds() > 3600:
+            print("asia: data stale (holiday / feed gap), skip"); return
         box = compute_box(closed, today)
         if not box: print("asia: box incomplete (holiday / data gap), no box today"); st["box"] = {"none": True}; save(STATE, st); return
         st["box"] = box; save(STATE, st)            # save before send: never double-send
-        broadcast(gs, box_text(box, today, late=(now - e).total_seconds() > 3600)); print(f"asia: BOX SENT {box['bot']:.2f}-{box['top']:.2f}")
+        wk = ""
+        if today.weekday() == 0:
+            try: wk = weekly_line(load(JOURNAL, []), now)
+            except Exception as ex: print(f"asia weekly line failed: {ex}")
+        broadcast(gs, box_text(box, today, late=(now - e).total_seconds() > 3600) + wk); print(f"asia: BOX SENT {box['bot']:.2f}-{box['top']:.2f}")
     box = st["box"]
     if box.get("none"): return
     end = pd.Timestamp(dt.datetime.combine(today + dt.timedelta(days=1), dt.time(), MT)).tz_convert("UTC")
@@ -204,12 +283,15 @@ def watch():
         k = classify(b, box)
         if not k or k in st["alerts"] or len(st["alerts"]) >= MAX_ALERTS_DAY: continue
         st["alerts"].append(k); save(STATE, st)
+        tr = h4_trend_at(d4, t + pd.Timedelta(minutes=15))
+        lv = sweep_levels(k, b, box) if k.startswith("sw") else breakout_levels(k, box)
         if (now - (t + pd.Timedelta(minutes=15))).total_seconds() > STALE_MIN * 60:
             print(f"asia: {k} at {t} too old, recorded without sending"); continue
-        tr = h4_trend_at(d4, t + pd.Timedelta(minutes=15))
-        broadcast(gs, alert_text(k, t, b, box, sweep_levels(k, b, box) if k.startswith("sw") else breakout_levels(k, box), tr))
+        _journal_add(k, t, box, lv, tr)
+        broadcast(gs, alert_text(k, t, b, box, lv, tr))
         print(f"asia: ALERT {k} bar {t}")
     save(STATE, st)
+    _journal_update(m15, now)   # a fresh alert may already be resolved by later closed bars (catch-up runs)
 
 def reply():
     global _post
@@ -246,7 +328,7 @@ def reply():
     names = {"brk_up": "شکست به بالا", "brk_dn": "شکست به پایین", "sw_hi": "سویپ سقف (SELL)", "sw_lo": "سویپ کف (BUY)"}
     msg = box_text(box, today).rsplit("\n\n📤", 1)[0]
     msg += f"\n\n💰 قیمت الان: <b>{last:.2f}</b> ({pos})\nهشدارهای امروز: " + ("، ".join(names[k] for k in fired) if fired else "هنوز هیچی")
-    _post(gs, chat, msg + foot)
+    _post(gs, chat, msg + foot + SRC_LINE)
 
 if __name__ == "__main__":
     try:

@@ -31,6 +31,6 @@ jobs:
         if: always()
         continue-on-error: true
         timeout-minutes: 3
-        run: ci/asia_state.sh pull && python asia_box.py --watch && ci/asia_state.sh push asia.json
+        run: ci/asia_state.sh pull && python asia_box.py --watch && ci/asia_state.sh push asia.json asia_journal.json
       - if: always()
         run: ci/state.sh push

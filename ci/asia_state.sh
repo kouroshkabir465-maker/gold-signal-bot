@@ -4,7 +4,7 @@
 set -e
 if [ "$1" = pull ]; then
   if git fetch -q origin state 2>/dev/null; then
-    for f in asia.json asia_prefs.json; do git show origin/state:$f > $f 2>/dev/null || rm -f $f; done
+    for f in asia.json asia_prefs.json asia_journal.json; do git show origin/state:$f > $f 2>/dev/null || rm -f $f; done
   fi
   exit 0
 fi
