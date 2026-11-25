@@ -8,3 +8,5 @@ trades.json
 listener_offset.json
 *.env
 heartbeat.txt
+asia.json
+asia_prefs.json

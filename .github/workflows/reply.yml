@@ -6,7 +6,7 @@ on:
     inputs:
       text: { description: "message text", default: "/check" }
 permissions:
-  contents: read
+  contents: write   # asia_box.py: save per-user on/off to the state branch (asia_prefs.json only)
 jobs:
   reply:
     runs-on: ubuntu-latest
@@ -24,4 +24,9 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12', cache: pip }
       - run: pip install -q -r requirements.txt
+      - name: Asian-session buttons (isolated add-on; never blocks the normal reply)
+        continue-on-error: true
+        timeout-minutes: 3
+        env: { ASIA_CHAT: "${{ github.event.client_payload.chat }}" }
+        run: ci/asia_state.sh pull && python asia_box.py --reply && ci/asia_state.sh push asia_prefs.json
       - run: python listener.py --reply

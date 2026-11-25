@@ -28,6 +28,8 @@ def gold_closed(now=None):
     return gs.market_closed(now)
 
 def reply(chat, text):
+    if text in ("📦 باکس آسیا امروز", "🌏 سشن آسیا روشن/خاموش", "سشن آسیا", "باکس آسیا", "باکس") or text.startswith("/asia"):
+        return   # Asian-session buttons are answered by asia_box.py --reply (separate reply.yml step)
     if text.startswith("/help"):
         send("sendMessage", data={"chat_id": chat, "text": HELP, "parse_mode": "HTML"}); return
     low = text.lower()
