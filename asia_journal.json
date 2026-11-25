@@ -35,9 +35,9 @@
   "box_bot": 3512.38,
   "box_size": 63.27,
   "quality": "پایین",
-  "status": "open",
+  "status": "TP1",
   "filled_at": "2026-11-25 20:30:00+00:00",
-  "result_at": null
+  "result_at": "2026-11-25 21:15:00+00:00"
  },
  {
   "id": "2026-11-25|sw_hi",
@@ -55,8 +55,8 @@
   "box_bot": 3512.38,
   "box_size": 63.27,
   "quality": "پایین",
-  "status": "open",
+  "status": "SL",
   "filled_at": "2026-11-25 20:45:00+00:00",
-  "result_at": null
+  "result_at": "2026-11-25 21:15:00+00:00"
  }
 ]
