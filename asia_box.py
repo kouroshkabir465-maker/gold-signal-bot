@@ -198,6 +198,7 @@ def watch():
     save(STATE, st)
 
 def reply():
+    global _post
     text, chat = (os.environ.get("TG_TEXT") or "").strip(), str(os.environ.get("ASIA_CHAT") or "")
     if not is_asia_text(text): print("asia: not an asia button, skip"); return
     gs = _gs()
@@ -210,6 +211,8 @@ def reply():
               + "\nسیگنال‌های اصلی ربات تغییری نمی‌کنن."); return
     import pandas as pd
     now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(TZ).date(); s, e = box_window(today)
+    if text == "/asia_test":   # one-off deploy preview, owner only
+        _p = _post; _post = lambda g, c, t: _p(g, c, "🧪 <b>پیام تست</b> — قابلیت جدید سشن آسیا نصب شد. این فقط پیش‌نمایشه، سیگنال نیست.\nدکمه‌های جدید پایین صفحه: «📦 باکس آسیا امروز» و «🌏 سشن آسیا روشن/خاموش».\n\n" + t)
     on = load(PREFS, {}).get(chat, True); foot = f"\n\nهشدارهای سشن آسیا برای تو: {'روشن ✅' if on else 'خاموش ⛔️'}"
     if gs.market_closed(now.to_pydatetime()):
         _post(gs, chat, "⛔ بازار طلا الان بسته‌ست؛ باکس آسیا روز معاملاتی بعد ساعت ۱۰:۰۰ استانبول آماده می‌شه." + foot); return
