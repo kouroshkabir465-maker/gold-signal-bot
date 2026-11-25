@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path = [x for x in sys.path if os.path.abspath(x or ".") != HERE]   # don't shadow stdlib "signal"
 TZ, MT = ZoneInfo("Europe/Istanbul"), ZoneInfo("Europe/Athens")
-BOX_START_H, BOX_END_H = 3, 10        # Istanbul hours [03:00, 10:00)
+BOX_START_H, BOX_END_H = 3, 10        # MT5 chart (broker server, Europe/Athens EET/EEST) hours [03:00, 10:00) = 04-11 Istanbul in winter, 03-10 in summer
 WIDE_USD = 60.0                       # box wider than this -> warning (backtest Sep 25-Nov 25 2026: median 44.5$, p75 63.1$)
 MIN_BOX_BARS = 24                     # of 28 M15 bars; fewer = holiday / data gap -> no box
 MIN_BOX_USD = 5.0                     # flatter = synthetic holiday bars (e.g. Dec 25 / Jan 1 / Good Friday) -> no box
@@ -36,10 +36,10 @@ def save(p, v):
 
 # ---------------- pure logic (shared with backtest) ----------------
 def box_window(day):
-    """day: date (Istanbul) -> (start, end) aware UTC timestamps of the box window."""
+    """day: MT5 server date -> (start, end) aware UTC timestamps of the box window (03:00-10:00 chart time)."""
     import pandas as pd
-    s = pd.Timestamp(dt.datetime(day.year, day.month, day.day, BOX_START_H, tzinfo=TZ)).tz_convert("UTC")
-    e = pd.Timestamp(dt.datetime(day.year, day.month, day.day, BOX_END_H, tzinfo=TZ)).tz_convert("UTC")
+    s = pd.Timestamp(dt.datetime(day.year, day.month, day.day, BOX_START_H, tzinfo=MT)).tz_convert("UTC")
+    e = pd.Timestamp(dt.datetime(day.year, day.month, day.day, BOX_END_H, tzinfo=MT)).tz_convert("UTC")
     return s, e
 
 def compute_box(m15, day):
@@ -81,7 +81,7 @@ def scan_day(m15, d4, day, now=None):
     box = compute_box(m15, day)
     if not box: return None, []
     _, e = box_window(day)
-    end = pd.Timestamp(dt.datetime(day.year, day.month, day.day, tzinfo=TZ) + dt.timedelta(days=1)).tz_convert("UTC")
+    end = pd.Timestamp(dt.datetime.combine(day + dt.timedelta(days=1), dt.time(), MT)).tz_convert("UTC")
     seen, out = set(), []
     for t, b in m15[(m15.index >= e) & (m15.index < end)].iterrows():
         k = classify(b, box)
@@ -90,15 +90,15 @@ def scan_day(m15, d4, day, now=None):
     return box, out
 
 # ---------------- text ----------------
-def ist(t): return t.tz_convert(TZ).strftime("%H:%M")
+def ist(t): return t.tz_convert(MT).strftime("%H:%M")   # shown in MT5 chart time
 def mt_hours(day):
-    s, e = box_window(day); return f"{s.tz_convert(MT):%H:%M} تا {e.tz_convert(MT):%H:%M}"
+    s, e = box_window(day); return f"{s.tz_convert(TZ):%H:%M} تا {e.tz_convert(TZ):%H:%M}"
 TREND = {1: "صعودی (بالای ابر)", -1: "نزولی (زیر ابر)", 0: "خنثی (داخل ابر)"}
 
 def box_text(box, day, late=False):
     import pandas as pd
     m = (f"🌏 <b>باکس سشن آسیا</b> ({day:%m-%d})\n"
-         f"⏰ ۰۳:۰۰ تا ۱۰:۰۰ استانبول (= {mt_hours(day)} ساعت چارت MT5)\n\n"
+         f"⏰ ۰۳:۰۰ تا ۱۰:۰۰ ساعت چارت MT5 (= {mt_hours(day)} استانبول)\n🕒 ساعت‌های این پیام به وقت چارت MT5 هستن.\n\n"
          f"🔺 سقف: <b>{box['top']:.2f}</b> ({ist(pd.Timestamp(box['t_top']))})\n"
          f"🔻 کف: <b>{box['bot']:.2f}</b> ({ist(pd.Timestamp(box['t_bot']))})\n"
          f"➖ وسط: {box['mid']:.2f}\n📏 اندازه: <b>{box['size']:.2f} دلار</b>")
@@ -178,7 +178,7 @@ def broadcast(gs, text):
 def watch():
     import pandas as pd
     gs = _gs()
-    now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(TZ).date()
+    now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(MT).date()
     if gs.market_closed(now.to_pydatetime()): print("asia: market closed, skip"); return
     _, e = box_window(today)
     if now < e: print("asia: before 10:00 Istanbul, nothing to do"); return
@@ -196,7 +196,7 @@ def watch():
         broadcast(gs, box_text(box, today, late=(now - e).total_seconds() > 3600)); print(f"asia: BOX SENT {box['bot']:.2f}-{box['top']:.2f}")
     box = st["box"]
     if box.get("none"): return
-    end = pd.Timestamp(dt.datetime.combine(today + dt.timedelta(days=1), dt.time(), TZ)).tz_convert("UTC")
+    end = pd.Timestamp(dt.datetime.combine(today + dt.timedelta(days=1), dt.time(), MT)).tz_convert("UTC")
     bars = closed[(closed.index >= e) & (closed.index < end)]
     if st.get("last_bar"): bars = bars[bars.index > pd.Timestamp(st["last_bar"])]
     for t, b in bars.iterrows():
@@ -224,18 +224,18 @@ def reply():
         _post(gs, chat, "🌏 هشدارهای سشن آسیا (باکس ساعت ۱۰، شکست و سویپ) " + ("<b>روشن</b> شد ✅" if on else "<b>خاموش</b> شد ⛔️\nبرای روشن کردن دوباره همین دکمه رو بزن.")
               + "\nسیگنال‌های اصلی ربات تغییری نمی‌کنن."); return
     import pandas as pd
-    now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(TZ).date(); s, e = box_window(today)
+    now = pd.Timestamp.now(tz="UTC"); today = now.tz_convert(MT).date(); s, e = box_window(today)
     if text == "/asia_test":   # one-off deploy preview, owner only
         _p = _post; _post = lambda g, c, t: _p(g, c, "🧪 <b>پیام تست</b> — قابلیت جدید سشن آسیا نصب شد. این فقط پیش‌نمایشه، سیگنال نیست.\nدکمه‌های جدید پایین صفحه: «📦 باکس آسیا امروز» و «🌏 سشن آسیا روشن/خاموش».\n\n" + t)
     on = load(PREFS, {}).get(chat, True); foot = f"\n\nهشدارهای سشن آسیا برای تو: {'روشن ✅' if on else 'خاموش ⛔️'}"
     if gs.market_closed(now.to_pydatetime()):
-        _post(gs, chat, "⛔ بازار طلا الان بسته‌ست؛ باکس آسیا روز معاملاتی بعد ساعت ۱۰:۰۰ استانبول آماده می‌شه." + foot); return
+        _post(gs, chat, "⛔ بازار طلا الان بسته‌ست؛ باکس آسیا روز معاملاتی بعد ساعت ۱۰:۰۰ چارت MT5 آماده می‌شه." + foot); return
     d4, m15, src = _data(gs)
     if m15 is None: _post(gs, chat, "⚠️ الان دادهٔ دقیق (Twelve Data) در دسترس نیست؛ چند دقیقه دیگه دوباره امتحان کن." + foot); return
     closed = m15[m15.index + pd.Timedelta(minutes=15) <= now]
     if now < e:
         w = closed[closed.index >= s]
-        msg = "⏳ باکس آسیا هنوز آماده نیست؛ ساعت ۱۰:۰۰ استانبول بسته می‌شه."
+        msg = f"⏳ باکس آسیا هنوز آماده نیست؛ ساعت ۱۰:۰۰ چارت MT5 ({e.tz_convert(TZ):%H:%M} استانبول) بسته می‌شه."
         if now >= s and len(w): msg += f"\nتا الان: سقف {w.High.max():.2f} | کف {w.Low.min():.2f} | اندازه {w.High.max() - w.Low.min():.2f} دلار"
         _post(gs, chat, msg + foot); return
     box = compute_box(closed, today)
