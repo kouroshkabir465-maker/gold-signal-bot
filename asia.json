@@ -11,8 +11,9 @@
   "t_bot": "2026-11-25 06:45:00+00:00"
  },
  "alerts": [
-  "brk_dn"
+  "brk_dn",
+  "sw_lo"
  ],
- "last_bar": "2026-11-25 15:00:00+00:00",
+ "last_bar": "2026-11-25 17:45:00+00:00",
  "seeded": "deploy day: box not re-sent"
 }
