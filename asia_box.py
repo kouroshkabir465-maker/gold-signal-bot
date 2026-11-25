@@ -17,6 +17,7 @@ MIN_BOX_USD = 5.0                     # flatter = synthetic holiday bars (e.g. D
 MAX_ALERTS_DAY = 4                    # breakout up/down + sweep high/low, at most one of each
 STOP_BUF = 1.0                        # $ beyond the sweep wick
 MAX_RISK_USD = 15.0                   # user's rule: 0.01 lot risk <= 15$
+BRK_RISK_FRAC, BRK_RISK_MIN, BRK_RISK_MAX = 0.2, 4.0, 12.0   # breakout retest stop = 20% of box, clamped 4..12$
 STALE_MIN = 60                        # don't alert on a bar that closed more than this many minutes ago
 STATE = os.path.join(HERE, "asia.json")
 PREFS = os.path.join(HERE, "asia_prefs.json")
@@ -85,7 +86,7 @@ def scan_day(m15, d4, day, now=None):
     for t, b in m15[(m15.index >= e) & (m15.index < end)].iterrows():
         k = classify(b, box)
         if not k or k in seen or len(seen) >= MAX_ALERTS_DAY: continue
-        seen.add(k); out.append((t, k, sweep_levels(k, b, box) if k.startswith("sw") else None, h4_trend_at(d4, t + pd.Timedelta(minutes=15))))
+        seen.add(k); out.append((t, k, sweep_levels(k, b, box) if k.startswith("sw") else breakout_levels(k, box), h4_trend_at(d4, t + pd.Timedelta(minutes=15))))
     return box, out
 
 # ---------------- text ----------------
@@ -102,39 +103,52 @@ def box_text(box, day, late=False):
          f"🔻 کف: <b>{box['bot']:.2f}</b> ({ist(pd.Timestamp(box['t_bot']))})\n"
          f"➖ وسط: {box['mid']:.2f}\n📏 اندازه: <b>{box['size']:.2f} دلار</b>")
     if box["size"] > WIDE_USD:
-        m += (f"\n\n⚠️ <b>باکس پهنه</b> (بیشتر از {WIDE_USD:.0f} دلار): شکست‌ها بیشتر فیک می‌شن و استاپ بزرگ می‌شه؛ "
-              f"منتظر پولبک و کندل تأیید بمون و ریسک ۰.۰۱ لات رو زیر {MAX_RISK_USD:.0f} دلار نگه دار.")
-    m += "\n\nبعد از این، اگه کندل ۱۵ دقیقه با بدنه بیرون باکس بسته بشه یا سویپ بزنه و برگرده داخل، خبرت می‌کنم."
+        m += f"\n\n⚠️ <b>باکس پهنه</b> (بیشتر از {WIDE_USD:.0f} دلار): استاپ‌ها بزرگ‌ترن؛ ریسک ۰.۰۱ لات رو زیر {MAX_RISK_USD:.0f} دلار نگه دار."
+    m += ("\n\n📤 بسته شدن کندل ۱۵ دقیقه بیرون باکس → سیگنال شکست با ورود روی پولبک\n"
+          "🔄 شدو بیرون باکس و بسته شدن داخلش → سیگنال سویپ")
     if late: m += "\n(این پیام با تأخیر اومد چون داده دیر رسید.)"
-    return m + "\n\n⚠️ تحلیل آموزشیه، توصیهٔ مالی نیست."
+    return m
 
 def align(side, tr):
-    if tr == side: return f"✅ هم‌جهت با روند H4 ({TREND[tr]})"
-    if tr == 0: return f"⚪️ روند H4 خنثیه ({TREND[tr]})"
-    return f"❌ خلاف روند H4 ({TREND[tr]}) — احتیاط"
+    if tr == side: return f"✅ هم‌جهت با روند H4: {TREND[tr]}"
+    if tr == 0: return f"⚪️ روند H4: {TREND[tr]}"
+    return f"❌ خلاف روند H4: {TREND[tr]}"
+
+def breakout_levels(kind, box):
+    """Retest plan: limit entry on the broken edge, stop back inside the box, 1R / 2R targets."""
+    risk = min(max(BRK_RISK_FRAC * box["size"], BRK_RISK_MIN), BRK_RISK_MAX)
+    if kind == "brk_up":
+        e = box["top"]; return dict(side=1, entry=e, sl=e - risk, tp1=e + risk, tp2=e + 2 * risk, risk=risk)
+    e = box["bot"]; return dict(side=-1, entry=e, sl=e + risk, tp1=e - risk, tp2=e - 2 * risk, risk=risk)
+
+def _lv_lines(lv, t1, t2):
+    return (f"🎯 <b>ورود:</b> {lv['entry']:.2f}\n🛑 <b>حد ضرر:</b> {lv['sl']:.2f}\n"
+            f"✅ <b>تارگت ۱{t1}:</b> {lv['tp1']:.2f}\n✅ <b>تارگت ۲{t2}:</b> {lv['tp2']:.2f}\n"
+            f"📏 ریسک: {lv['risk']:.2f} دلار (۰.۰۱ لات ≈ {lv['risk']:.0f} دلار)")
 
 def alert_text(kind, t, bar, box, lv, tr):
     import pandas as pd
     when = ist(t + pd.Timedelta(minutes=15))
     if kind.startswith("brk"):
-        up = kind == "brk_up"
-        return (f"🌏📤 <b>شکست باکس آسیا {'به بالا' if up else 'به پایین'}</b> — {'BUY' if up else 'SELL'} bias\n"
-                f"کندل ۱۵ دقیقه ({ist(t)}–{when}) با بدنه {'بالای سقف' if up else 'زیر کف'} {box['top' if up else 'bot']:.2f} بسته شد: <b>{bar.Close:.2f}</b>\n"
-                f"{align(1 if up else -1, tr)}\n\n"
-                f"باکس: {box['bot']:.2f} – {box['top']:.2f} ({box['size']:.0f} دلار)\n"
-                "این خودش سیگنال ورود نیست؛ بهتره منتظر پولبک به لبهٔ باکس و کندل تأیید بمونی."
-                + ("\n⚠️ باکس پهنه؛ احتمال شکست فیک بیشتره." if box["size"] > WIDE_USD else "")
-                + "\n\n⚠️ تحلیل آموزشیه، توصیهٔ مالی نیست.")
+        lv = lv or breakout_levels(kind, box); up = lv["side"] > 0
+        edge = "سقف" if up else "کف"
+        return ("\u200f" + ("🟢 <b>BUY</b>" if up else "🔴 <b>SELL</b>") + f" — شکست {edge} باکس آسیا\n"
+                f"کندل ۱۵ دقیقه ({ist(t)}–{when}) {'بالای' if up else 'زیر'} {edge} {lv['entry']:.2f} بسته شد: <b>{bar.Close:.2f}</b>\n"
+                f"{align(lv['side'], tr)}\n\n"
+                f"📌 <b>نوع سفارش:</b> {'Buy Limit' if up else 'Sell Limit'} روی پولبک به {edge} باکس\n"
+                + _lv_lines(lv, " (1R)", " (2R)") +
+                f"\n\n❌ ابطال: اگه قبل از پولبک کندل ۱۵ دقیقه دوباره داخل باکس بسته شد، یا تا آخر امروز پر نشد، سفارش رو پاک کن.\n"
+                f"باکس: {box['bot']:.2f} – {box['top']:.2f} ({box['size']:.0f} دلار)")
     b = lv["side"] > 0
-    m = (f"🌏🔄 <b>سویپ {'کف' if b else 'سقف'} باکس آسیا — {'🟢 BUY' if b else '🔴 SELL'}</b>\n"
+    m = ("\u200f" + ("🟢 <b>BUY</b>" if b else "🔴 <b>SELL</b>") + f" — سویپ {'کف' if b else 'سقف'} باکس آسیا\n"
          f"کندل ۱۵ دقیقه ({ist(t)}–{when}) شدو زد {'زیر کف' if b else 'بالای سقف'} {box['bot' if b else 'top']:.2f} "
-         f"(تا {bar.Low if b else bar.High:.2f}) ولی داخل باکس بسته شد.\n{align(lv['side'], tr)}\n\n"
-         f"🎯 <b>ورود:</b> {lv['entry']:.2f}\n🛑 <b>حد ضرر:</b> {lv['sl']:.2f} (پشت شدوی سویپ)\n"
-         f"✅ <b>تارگت ۱ (وسط باکس):</b> {lv['tp1']:.2f}\n✅ <b>تارگت ۲ ({'سقف' if b else 'کف'} باکس):</b> {lv['tp2']:.2f}\n"
-         f"📏 ریسک: {lv['risk']:.2f} دلار (با ۰.۰۱ لات ≈ {lv['risk']:.0f} دلار)")
-    if lv["risk"] > MAX_RISK_USD: m += f"\n⚠️ ریسک بیشتر از {MAX_RISK_USD:.0f} دلاره؛ طبق قانونت کنارش بذار یا حجم رو کم کن."
-    if (lv["tp1"] - lv["entry"]) * lv["side"] <= 0: m += "\n⚠️ قیمت از وسط باکس رد شده؛ تارگت ۱ عملاً خورده، فقط تارگت ۲ مونده."
-    return m + "\n\nسویپ به‌تنهایی کافی نیست؛ با H4 و کندل تأیید بسنج.\n⚠️ تحلیل آموزشیه، توصیهٔ مالی نیست."
+         f"(تا {bar.Low if b else bar.High:.2f}) و داخل باکس بسته شد.\n{align(lv['side'], tr)}\n\n"
+         f"📌 <b>نوع سفارش:</b> {'Buy' if b else 'Sell'} Market (قیمت بسته شدن کندل)\n"
+         + _lv_lines(lv, " (وسط باکس)", f" ({'سقف' if b else 'کف'} باکس)") +
+         f"\n⚖️ ریسک به ریوارد: ۱:{abs(lv['tp1'] - lv['entry']) / lv['risk']:.1f} تا ۱:{abs(lv['tp2'] - lv['entry']) / lv['risk']:.1f}")
+    if lv["risk"] > MAX_RISK_USD: m += f"\n⚠️ ریسک بیشتر از {MAX_RISK_USD:.0f} دلاره؛ طبق قانونت حجم رو کم کن یا رد کن."
+    if (lv["tp1"] - lv["entry"]) * lv["side"] <= 0: m += "\n⚠️ قیمت از وسط باکس رد شده؛ فقط تارگت ۲ معتبره."
+    return m
 
 # ---------------- live ----------------
 def _gs():
@@ -193,7 +207,7 @@ def watch():
         if (now - (t + pd.Timedelta(minutes=15))).total_seconds() > STALE_MIN * 60:
             print(f"asia: {k} at {t} too old, recorded without sending"); continue
         tr = h4_trend_at(d4, t + pd.Timedelta(minutes=15))
-        broadcast(gs, alert_text(k, t, b, box, sweep_levels(k, b, box) if k.startswith("sw") else None, tr))
+        broadcast(gs, alert_text(k, t, b, box, sweep_levels(k, b, box) if k.startswith("sw") else breakout_levels(k, box), tr))
         print(f"asia: ALERT {k} bar {t}")
     save(STATE, st)
 
@@ -230,9 +244,9 @@ def reply():
     pos = "بالای باکس" if last > box["top"] else "زیر باکس" if last < box["bot"] else "داخل باکس"
     st = load(STATE, {}); fired = st.get("alerts", []) if st.get("day") == str(today) else []
     names = {"brk_up": "شکست به بالا", "brk_dn": "شکست به پایین", "sw_hi": "سویپ سقف (SELL)", "sw_lo": "سویپ کف (BUY)"}
-    msg = box_text(box, today).rsplit("\n\nبعد از این", 1)[0]
+    msg = box_text(box, today).rsplit("\n\n📤", 1)[0]
     msg += f"\n\n💰 قیمت الان: <b>{last:.2f}</b> ({pos})\nهشدارهای امروز: " + ("، ".join(names[k] for k in fired) if fired else "هنوز هیچی")
-    _post(gs, chat, msg + foot + "\n\n⚠️ تحلیل آموزشیه، توصیهٔ مالی نیست.")
+    _post(gs, chat, msg + foot)
 
 if __name__ == "__main__":
     try:
