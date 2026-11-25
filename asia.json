@@ -12,8 +12,9 @@
  },
  "alerts": [
   "brk_dn",
-  "sw_lo"
+  "sw_lo",
+  "brk_up"
  ],
- "last_bar": "2026-11-25 20:00:00+00:00",
+ "last_bar": "2026-11-25 20:15:00+00:00",
  "seeded": "deploy day: box not re-sent"
 }
