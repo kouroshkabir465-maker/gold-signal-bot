@@ -6,7 +6,7 @@ TZ = ZoneInfo("Europe/Istanbul")
 TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_IDS = [c.strip() for c in (os.environ.get("TELEGRAM_CHAT_ID") or open("/workspace/tg_chat_id").read()).split(",") if c.strip()]
 CHAT_ID = CHAT_IDS[0]
-KB = '{"keyboard": [[{"text": "🔍 بررسی کن"}, {"text": "📅 تقویم"}]], "resize_keyboard": true, "is_persistent": true}'
+KB = '{"keyboard": [[{"text": "🔍 بررسی کن"}, {"text": "📅 تقویم"}], [{"text": "📦 باکس آسیا امروز"}, {"text": "🌏 سشن آسیا روشن/خاموش"}]], "resize_keyboard": true, "is_persistent": true}'  # must equal signal.KB, else the daily news message hides row 2
 URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 TOP = ("Non-Farm", "CPI", "FOMC", "Federal Funds", "Powell", "GDP", "PCE", "Unemployment Rate", "Retail Sales", "PPI", "ISM")
 
