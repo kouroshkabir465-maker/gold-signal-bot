@@ -75,8 +75,8 @@
   "box_bot": 3556.04,
   "box_size": 110.63,
   "quality": "پایین",
-  "status": "pending",
-  "filled_at": null,
+  "status": "open",
+  "filled_at": "2026-11-27 12:45:00+00:00",
   "result_at": null
  }
 ]
